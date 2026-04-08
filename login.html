@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<link rel="icon" type="image/x-icon" href="../assets/icons/SOFTKES.ico">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>L-TEL | Validador de Cobertura</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+<style>
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --primary:#0ea5e9;--primary-dark:#0284c7;--primary-light:#38bdf8;
+  --accent:#06b6d4;--dark:#0a1628;--bg:#0f1e35;
+  --text:#ffffff;--text-secondary:#94a3b8;--text-muted:#475569;
+  --border:rgba(255,255,255,0.08);--border-hover:rgba(14,165,233,0.4);
+  --card:rgba(255,255,255,0.04);
+  --danger:#ef4444;--success:#22c55e;
+  --radius:10px;--radius-lg:16px;--radius-xl:20px;
+}
+html{scroll-behavior:smooth}
+body{font-family:'Inter',sans-serif;background:var(--dark);min-height:100vh;display:flex;align-items:center;justify-content:center;-webkit-font-smoothing:antialiased;overflow:hidden;position:relative}
+
+/* Background */
+.bg-scene{position:fixed;inset:0;z-index:0}
+.bg-gradient{position:absolute;inset:0;background:radial-gradient(ellipse at 20% 50%,rgba(6,182,212,0.12) 0%,transparent 60%),radial-gradient(ellipse at 80% 20%,rgba(14,165,233,0.1) 0%,transparent 60%),linear-gradient(160deg,#0a1628 0%,#0d1f3c 50%,#0a1628 100%)}
+.bg-grid{position:absolute;inset:0;background-image:linear-gradient(rgba(255,255,255,0.02) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,0.02) 1px,transparent 1px);background-size:48px 48px}
+.bg-orb{position:absolute;border-radius:50%;filter:blur(90px);pointer-events:none;animation:orbFloat 18s ease-in-out infinite}
+.bg-orb-1{width:500px;height:500px;background:rgba(6,182,212,0.08);top:-150px;right:-100px}
+.bg-orb-2{width:400px;height:400px;background:rgba(14,165,233,0.07);bottom:-100px;left:-100px;animation-delay:-9s;animation-direction:reverse}
+@keyframes orbFloat{0%,100%{transform:translate(0,0)}50%{transform:translate(20px,-25px)}}
+
+/* Particles */
+.particle{position:absolute;width:2px;height:2px;background:var(--primary);border-radius:50%;opacity:0;animation:particleFloat linear infinite}
+@keyframes particleFloat{0%{transform:translateY(100vh) translateX(0);opacity:0}10%{opacity:.6}90%{opacity:.3}100%{transform:translateY(-10vh) translateX(40px);opacity:0}}
+
+/* Card */
+.login-wrapper{position:relative;z-index:1;width:100%;max-width:420px;padding:1.5rem}
+.login-card{background:rgba(15,30,53,0.85);backdrop-filter:blur(24px);border:1px solid var(--border);border-radius:var(--radius-xl);padding:2.5rem;box-shadow:0 30px 60px rgba(0,0,0,0.5),0 0 0 1px rgba(255,255,255,0.03),inset 0 1px 0 rgba(255,255,255,0.06)}
+
+/* Logo */
+.logo{text-align:center;margin-bottom:2rem}
+.logo-img-wrap{width:90px;height:90px;margin:0 auto 1.25rem;border-radius:20px;overflow:hidden;border:2px solid rgba(14,165,233,0.3);box-shadow:0 0 30px rgba(6,182,212,0.2);background:#fff;display:flex;align-items:center;justify-content:center}
+.logo-img-wrap img{width:100%;height:100%;object-fit:contain;padding:6px}
+.logo-title{font-size:1.6rem;font-weight:800;color:#fff;letter-spacing:-.5px}
+.logo-sub{font-size:.82rem;color:var(--text-secondary);margin-top:.3rem}
+.logo-badge{display:inline-flex;align-items:center;gap:.4rem;padding:.3rem .85rem;background:rgba(6,182,212,0.12);border:1px solid rgba(6,182,212,0.25);border-radius:50px;font-size:.7rem;color:var(--primary-light);font-weight:600;margin-top:.8rem;letter-spacing:.04em}
+
+/* Form */
+.form-group{margin-bottom:1.2rem}
+.form-label{display:block;font-size:.8rem;font-weight:600;color:rgba(255,255,255,0.65);margin-bottom:.5rem;letter-spacing:.3px}
+.form-input-wrap{position:relative}
+.form-icon{position:absolute;left:13px;top:50%;transform:translateY(-50%);color:rgba(255,255,255,0.25);font-size:.85rem;pointer-events:none}
+.form-input{width:100%;padding:.85rem 1rem .85rem 2.4rem;background:rgba(255,255,255,0.05);border:1px solid var(--border);border-radius:var(--radius);color:#fff;font-family:'Inter',sans-serif;font-size:.9rem;outline:none;transition:all .2s}
+.form-input::placeholder{color:rgba(255,255,255,.22)}
+.form-input:focus{border-color:var(--primary);background:rgba(14,165,233,.07);box-shadow:0 0 0 3px rgba(14,165,233,.15)}
+.form-input.error{border-color:var(--danger)}
+.toggle-pass{position:absolute;right:12px;top:50%;transform:translateY(-50%);background:none;border:none;color:rgba(255,255,255,.3);cursor:pointer;font-size:.85rem;padding:4px;transition:color .2s}
+.toggle-pass:hover{color:rgba(255,255,255,.7)}
+
+/* Error */
+.error-msg{display:none;align-items:center;gap:.5rem;padding:.8rem 1rem;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.25);border-radius:var(--radius);color:#fca5a5;font-size:.82rem;margin-bottom:1rem}
+.error-msg.show{display:flex}
+
+/* Button */
+.btn-login{width:100%;padding:.9rem;background:linear-gradient(135deg,var(--primary),var(--primary-dark));color:#fff;border:none;border-radius:var(--radius);font-family:'Inter',sans-serif;font-size:.95rem;font-weight:600;cursor:pointer;transition:all .3s;display:flex;align-items:center;justify-content:center;gap:.5rem;box-shadow:0 4px 20px rgba(14,165,233,.3);margin-top:.5rem}
+.btn-login:hover:not(:disabled){transform:translateY(-1px);box-shadow:0 6px 25px rgba(14,165,233,.45)}
+.btn-login:disabled{opacity:.65;cursor:not-allowed;transform:none}
+.spinner{width:18px;height:18px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:spin .8s linear infinite;display:none}
+.btn-login.loading .spinner{display:block}
+.btn-login.loading .btn-text{display:none}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* Footer */
+.login-footer{text-align:center;margin-top:1.75rem;font-size:.78rem;color:rgba(255,255,255,.28)}
+.login-footer a{color:var(--primary-light);text-decoration:none;transition:color .2s}
+.login-footer a:hover{color:#fff}
+
+/* Divider */
+.divider{display:flex;align-items:center;gap:.75rem;margin:1.25rem 0;color:rgba(255,255,255,.15);font-size:.75rem}
+.divider::before,.divider::after{content:'';flex:1;height:1px;background:var(--border)}
+
+@media(max-width:480px){
+  .login-wrapper{padding:.75rem}
+  .login-card{padding:2rem 1.5rem;border-radius:var(--radius-lg)}
+}
+</style>
+</head>
+<body>
+
+<div class="bg-scene">
+  <div class="bg-gradient"></div>
+  <div class="bg-grid"></div>
+  <div class="bg-orb bg-orb-1"></div>
+  <div class="bg-orb bg-orb-2"></div>
+</div>
+
+<div class="login-wrapper">
+  <div class="login-card">
+
+    <div class="logo">
+      <div class="logo-img-wrap">
+        <img src="../assets/icons/ltel.jpeg" alt="L-TEL">
+      </div>
+      <div class="logo-title">L-TEL</div>
+      <div class="logo-sub">Validador de Cobertura</div>
+      <div class="logo-badge"><i class="fas fa-shield-alt"></i>&nbsp; Acceso Restringido</div>
+    </div>
+
+    <div class="error-msg" id="errorMsg">
+      <i class="fas fa-exclamation-circle"></i>
+      <span id="errorText">Usuario o contraseña incorrectos.</span>
+    </div>
+
+    <form id="loginForm" autocomplete="off">
+      <div class="form-group">
+        <label class="form-label">Usuario</label>
+        <div class="form-input-wrap">
+          <i class="fas fa-user form-icon"></i>
+          <input type="text" id="usuario" class="form-input" placeholder="Nombre de usuario" required autocomplete="username">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Contraseña</label>
+        <div class="form-input-wrap">
+          <i class="fas fa-lock form-icon"></i>
+          <input type="password" id="password" class="form-input" placeholder="••••••••" required autocomplete="off">
+          <button type="button" class="toggle-pass" id="togglePassBtn">
+            <i class="fas fa-eye" id="eyeIcon"></i>
+          </button>
+        </div>
+      </div>
+
+      <button type="submit" class="btn-login" id="loginBtn">
+        <span class="btn-text"><i class="fas fa-sign-in-alt"></i>&nbsp; Iniciar Sesión</span>
+        <div class="spinner"></div>
+      </button>
+    </form>
+
+    <div class="login-footer">
+      &copy; 2026 L-TEL &mdash; Validador<br>
+      <a href="mailto:csvasquezf@gmail.com">Soporte Técnico</a>
+    </div>
+
+  </div>
+</div>
+
+<script>
+const firebaseConfig={
+  apiKey:"AIzaSyDre3Wdt__AKKP2NGiv-I5ksqscoVPDsho",
+  authDomain:"softkes-ssi.firebaseapp.com",
+  projectId:"softkes-ssi",
+  storageBucket:"softkes-ssi.firebasestorage.app",
+  messagingSenderId:"949401432052",
+  appId:"1:949401432052:web:131984f96192cf9ff493a1"
+};
+firebase.initializeApp(firebaseConfig);
+const db=firebase.firestore();
+
+if(sessionStorage.getItem('validadorUser')) window.location.href='dashboard.html';
+
+// Toggle password
+document.getElementById('togglePassBtn').addEventListener('click',function(){
+  const inp=document.getElementById('password');
+  const icon=document.getElementById('eyeIcon');
+  const show=inp.type==='password';
+  inp.type=show?'text':'password';
+  icon.className=show?'fas fa-eye-slash':'fas fa-eye';
+});
+
+function setLoading(on){
+  const btn=document.getElementById('loginBtn');
+  btn.disabled=on;
+  btn.classList.toggle('loading',on);
+}
+function showError(msg){
+  document.getElementById('errorText').textContent=msg;
+  document.getElementById('errorMsg').classList.add('show');
+}
+function hideError(){
+  document.getElementById('errorMsg').classList.remove('show');
+}
+
+document.getElementById('loginForm').addEventListener('submit',async(e)=>{
+  e.preventDefault();
+  hideError();
+  const usuario=document.getElementById('usuario').value.trim();
+  const password=document.getElementById('password').value;
+  if(!usuario||!password){showError('Completa todos los campos.');return;}
+  setLoading(true);
+  try{
+    const snap=await db.collection('validador_usuarios')
+      .where('usuario','==',usuario)
+      .where('password','==',password)
+      .where('activo','==',true)
+      .limit(1).get();
+    if(snap.empty){showError('Usuario o contraseña incorrectos.');setLoading(false);return;}
+    const user=snap.docs[0].data();
+    sessionStorage.setItem('validadorUser',JSON.stringify({
+      id:snap.docs[0].id,
+      usuario:user.usuario,
+      nombre:user.nombre||usuario,
+      rol:user.rol||'operador'
+    }));
+    window.location.href='dashboard.html';
+  }catch(err){
+    showError('Error de conexión. Intenta de nuevo.');
+    setLoading(false);
+  }
+});
+
+// Particles
+(function(){
+  const body=document.body;
+  for(let i=0;i<18;i++){
+    const p=document.createElement('div');
+    p.className='particle';
+    p.style.cssText=`left:${Math.random()*100}%;width:${Math.random()*2+1}px;height:${Math.random()*2+1}px;animation-duration:${Math.random()*15+10}s;animation-delay:${Math.random()*10}s;opacity:0`;
+    body.appendChild(p);
+  }
+})();
+</script>
+</body>
+</html>
