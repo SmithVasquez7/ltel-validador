@@ -37,9 +37,9 @@ const WIN = {
 
   sel: {
     // ── Login ──
-    input_usuario:  '#email',
+    input_usuario:  '#username',
     input_password: '#password',
-    btn_login:      '[type="submit"]',
+    btn_login:      '#ingresar',
 
     // ── Menú Ventas ──
     menu_ventas: '.menu-link',   // se filtra por texto "Ventas"
