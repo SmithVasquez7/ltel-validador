@@ -185,16 +185,26 @@ async function doLogin(pg) {
   await shot(pg, '02_login_filled');
   await pg.click(WIN.sel.btn_login);
 
-  // Esperar navegación post-login
-  await pg.waitForNavigation({ waitUntil: 'networkidle2', timeout: 20000 });
-  await shot(pg, '03_post_login');
-
-  const url = pg.url();
-  if (url.includes('/login')) {
-    throw new Error('Login fallido — verifica credenciales WIN');
+  // Esperar que desaparezca la página de login (max 25s)
+  try {
+    await pg.waitForFunction(() => !window.location.href.includes('/login'), { timeout: 25000 });
+  } catch(_) {
+    await shot(pg, '03_login_failed');
+    const url2 = pg.url();
+    throw new Error(`Login fallido — sigue en login. URL: ${url2}`);
   }
+
+  // Esperar que el menú principal cargue completamente
+  try {
+    await pg.waitForSelector('[data-kt-menu-trigger="click"]', { timeout: 15000 });
+  } catch(_) {
+    await shot(pg, '03_menu_no_cargo');
+    throw new Error('Login OK pero el menú no cargó. URL: ' + pg.url());
+  }
+
+  await shot(pg, '03_post_login');
   loggedIn = true;
-  console.log('✓ Login exitoso. URL:', url);
+  console.log('✓ Login exitoso. URL:', pg.url());
 }
 
 // Detecta si WIN cerró la sesión y re-ingresa automáticamente
@@ -447,6 +457,19 @@ async function limpiarYEscribir(pg, selector, texto) {
 // ─────────────────────────────────────────
 // ENDPOINTS
 // ─────────────────────────────────────────
+
+// Debug: ver estado actual del navegador
+app.get('/debug', async (_req, res) => {
+  try {
+    if (!page || page.isClosed()) return res.json({ ok: false, msg: 'Sin página activa' });
+    const url   = page.url();
+    const title = await page.title().catch(() => '');
+    const shot64 = await page.screenshot({ encoding: 'base64', type: 'jpeg', quality: 60 }).catch(() => null);
+    res.json({ ok: true, url, title, loggedIn, screenshot: shot64 ? `data:image/jpeg;base64,${shot64}` : null });
+  } catch(e) {
+    res.json({ ok: false, error: e.message });
+  }
+});
 
 // Progreso actual de la automatización
 app.get('/progreso', (_req, res) => {
