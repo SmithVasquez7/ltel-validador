@@ -41,11 +41,11 @@ const WIN = {
     input_password: '#password',
     btn_login:      '#ingresar',
 
-    // ── Menú Ventas ──
-    menu_ventas: '.menu-link',   // se filtra por texto "Ventas"
+    // ── Menú Ventas ── (trigger del menú desplegable, no el subitem)
+    menu_ventas: '[data-kt-menu-trigger="click"]',  // se filtra por texto "Ventas"
 
     // ── Botón Nuevo Lead ──
-    btn_nuevo_lead: '#btnNuevoLead',
+    btn_nuevo_lead: 'a[href="nuevoSeguimiento"]',
 
     // ── Formulario Dirección (calle) ──
     input_distrito:  '#gf_distrito',
@@ -231,16 +231,16 @@ async function ejecutarValidacion(datos) {
   await checkSesionWIN(pg);
 
   try {
-    // Buscar el link de menú que contenga el texto "Ventas"
+    // Buscar el trigger del menú "Ventas" (data-kt-menu-trigger)
     await pg.waitForFunction(() => {
-      const links = document.querySelectorAll('.menu-link');
-      return [...links].some(l => l.textContent.trim().includes('Ventas'));
+      const items = document.querySelectorAll('[data-kt-menu-trigger="click"]');
+      return [...items].some(el => el.querySelector('.menu-title')?.textContent.trim() === 'Ventas');
     }, { timeout: 10000 });
 
     await pg.evaluate(() => {
-      const links = document.querySelectorAll('.menu-link');
-      const ventas = [...links].find(l => l.textContent.trim().includes('Ventas'));
-      if (ventas) ventas.click();
+      const items = document.querySelectorAll('[data-kt-menu-trigger="click"]');
+      const ventas = [...items].find(el => el.querySelector('.menu-title')?.textContent.trim() === 'Ventas');
+      if (ventas) ventas.querySelector('.menu-link').click();
     });
 
     await pg.waitForTimeout(800);
