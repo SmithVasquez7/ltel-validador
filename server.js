@@ -168,11 +168,11 @@ async function getPage() {
 async function doLogin(pg) {
   setProgreso(1, 'Iniciando sesión en WIN...', '🔑');
   console.log('🔑 Haciendo login en WIN...');
-  await pg.goto(WIN.url_login, { waitUntil: 'networkidle2', timeout: 30000 });
+  await pg.goto(WIN.url_login, { waitUntil: 'domcontentloaded', timeout: 30000 });
   await shot(pg, '01_login_page');
 
   // Esperar campo usuario
-  await pg.waitForSelector(WIN.sel.input_usuario, { timeout: 12000 });
+  await pg.waitForSelector(WIN.sel.input_usuario, { timeout: 15000 });
 
   // Llenar usuario
   await pg.click(WIN.sel.input_usuario, { clickCount: 3 });
@@ -185,9 +185,9 @@ async function doLogin(pg) {
   await shot(pg, '02_login_filled');
   await pg.click(WIN.sel.btn_login);
 
-  // Esperar que desaparezca la página de login (max 25s)
+  // Esperar que desaparezca la página de login (max 30s)
   try {
-    await pg.waitForFunction(() => !window.location.href.includes('/login'), { timeout: 25000 });
+    await pg.waitForFunction(() => !window.location.href.includes('/login'), { timeout: 30000 });
   } catch(_) {
     await shot(pg, '03_login_failed');
     const url2 = pg.url();
