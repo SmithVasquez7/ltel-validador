@@ -99,6 +99,18 @@ function loadCreds() {
 }
 loadCreds();
 
+// ─────────────────────────────────────────
+// PROGRESO — estado actual de la automatización
+// ─────────────────────────────────────────
+let progreso = { num: 0, total: 11, paso: 'En espera', icono: '⏳', activo: false };
+function setProgreso(num, paso, icono = '⚙️') {
+  progreso = { num, total: 11, paso, icono, activo: true, ts: Date.now() };
+  console.log(`  [${num}/11] ${icono} ${paso}`);
+}
+function resetProgreso() {
+  progreso = { num: 0, total: 11, paso: 'En espera', icono: '⏳', activo: false };
+}
+
 // Carpeta screenshots
 const SHOTS_DIR = path.join(__dirname, 'screenshots');
 if (!fs.existsSync(SHOTS_DIR)) fs.mkdirSync(SHOTS_DIR);
@@ -154,6 +166,7 @@ async function getPage() {
 // LOGIN EN WIN
 // ─────────────────────────────────────────
 async function doLogin(pg) {
+  setProgreso(1, 'Iniciando sesión en WIN...', '🔑');
   console.log('🔑 Haciendo login en WIN...');
   await pg.goto(WIN.url_login, { waitUntil: 'networkidle2', timeout: 30000 });
   await shot(pg, '01_login_page');
@@ -201,6 +214,7 @@ async function checkSesionWIN(pg) {
 // FLUJO COMPLETO DE VALIDACIÓN
 // ─────────────────────────────────────────
 async function ejecutarValidacion(datos) {
+  resetProgreso();
   const pg = await getPage();
 
   // Login inicial o re-login si la sesión expiró
@@ -211,6 +225,7 @@ async function ejecutarValidacion(datos) {
   }
 
   // ── PASO 1: Clic en menú "Ventas" ──────────────────────────────
+  setProgreso(2, 'Navegando al menú Ventas...', '📋');
   console.log('📌 Paso 1: Navegando a Ventas...');
   // Verificar sesión antes de navegar (WIN puede haber cerrado sesión)
   await checkSesionWIN(pg);
@@ -235,6 +250,7 @@ async function ejecutarValidacion(datos) {
   }
 
   // ── PASO 2: Clic en "Añadir nuevo Lead" ───────────────────────
+  setProgreso(3, 'Abriendo formulario de nuevo Lead...', '📝');
   console.log('📌 Paso 2: Clic en Nuevo Lead...');
   await pg.waitForSelector(WIN.sel.btn_nuevo_lead, { timeout: 10000 });
   await pg.click(WIN.sel.btn_nuevo_lead);
@@ -243,6 +259,7 @@ async function ejecutarValidacion(datos) {
 
   // ── PASO 3: Llenar formulario según tipo ───────────────────────
   if (datos.tipo === 'coords') {
+    setProgreso(4, 'Ingresando coordenadas GPS...', '📍');
     console.log('📌 Paso 3: Ingresando coordenadas...');
     const [lat, lon] = datos.direccion.split(',').map(s => s.trim());
 
@@ -252,6 +269,7 @@ async function ejecutarValidacion(datos) {
     await shot(pg, '06_coords_filled');
 
   } else {
+    setProgreso(4, 'Ingresando dirección por calle...', '🏠');
     console.log('📌 Paso 3: Ingresando dirección por calle...');
 
     // Distrito
@@ -275,6 +293,7 @@ async function ejecutarValidacion(datos) {
   }
 
   // ── PASO 4: Clic en Buscar ─────────────────────────────────────
+  setProgreso(5, 'Buscando ubicación en mapa...', '🗺️');
   console.log('📌 Paso 4: Buscando en mapa...');
   await pg.waitForSelector(WIN.sel.btn_buscar, { timeout: 8000 });
   await pg.click(WIN.sel.btn_buscar);
@@ -284,6 +303,7 @@ async function ejecutarValidacion(datos) {
   await shot(pg, '07_after_buscar');
 
   // ── PASO 5: Clic en Confirmar del popup ───────────────────────
+  setProgreso(6, 'Confirmando punto en el mapa...', '📌');
   console.log('📌 Paso 5: Esperando popup de confirmación...');
   try {
     await pg.waitForSelector(WIN.sel.popup_confirmar, { timeout: 20000 });
@@ -303,6 +323,7 @@ async function ejecutarValidacion(datos) {
     await shot(pg, '09_confirmar_clicked');
 
     // ── PASO 6: Clic en Continuar ─────────────────────────────────
+    setProgreso(7, 'Avanzando a información del cliente...', '➡️');
     console.log('📌 Paso 6: Esperando y clicando Continuar...');
     await pg.waitForSelector(WIN.sel.btn_continuar, { timeout: 25000 });
     await shot(pg, '10_continuar_visible');
@@ -311,6 +332,7 @@ async function ejecutarValidacion(datos) {
     await shot(pg, '11_info_cliente_tab');
 
     // ── PASO 7: Leer resultado de cobertura ───────────────────────
+    setProgreso(8, 'Verificando cobertura WIN...', '📡');
     console.log('📌 Paso 7: Verificando cobertura...');
     let tieneCobertura = false;
     try {
@@ -333,6 +355,7 @@ async function ejecutarValidacion(datos) {
     }
 
     // ── PASO 8: Seleccionar tipo de documento "DNI" ───────────────
+    setProgreso(9, 'Seleccionando tipo de documento DNI...', '🪪');
     console.log('📌 Paso 8: Seleccionando tipo DNI...');
     try {
       await pg.click(WIN.sel.select2_tipo_doc);
@@ -350,17 +373,20 @@ async function ejecutarValidacion(datos) {
     }
 
     // ── PASO 9: Ingresar número de DNI ────────────────────────────
+    setProgreso(9, `Ingresando DNI ${datos.dni}...`, '🔢');
     console.log('📌 Paso 9: Ingresando DNI:', datos.dni);
     if (!datos.dni) throw new Error('DNI no proporcionado para búsqueda de score');
     await limpiarYEscribir(pg, WIN.sel.input_dni, datos.dni);
     await shot(pg, '14_dni_ingresado');
 
     // ── PASO 10: Clic en buscar score ─────────────────────────────
+    setProgreso(10, 'Consultando score crediticio...', '📊');
     console.log('📌 Paso 10: Buscando score del cliente...');
     await pg.click(WIN.sel.btn_buscar_score);
     await shot(pg, '15_score_buscando');
 
     // ── PASO 11: Esperar resultado del score ──────────────────────
+    setProgreso(11, 'Esperando resultado del score...', '⏳');
     console.log('⏳ Esperando resultado del score...');
     try {
       await pg.waitForFunction(() => {
@@ -422,8 +448,13 @@ async function limpiarYEscribir(pg, selector, texto) {
 // ENDPOINTS
 // ─────────────────────────────────────────
 
+// Progreso actual de la automatización
+app.get('/progreso', (_req, res) => {
+  res.json(progreso);
+});
+
 // Estado
-app.get('/estado', (req, res) => {
+app.get('/estado', (_req, res) => {
   res.json({
     ok:            true,
     servidor:      'L-TEL Validador WIN v2.0',
@@ -484,7 +515,7 @@ app.post('/configurar', (req, res) => {
 });
 
 // Forzar logout WIN
-app.post('/logout-win', async (req, res) => {
+app.post('/logout-win', async (_req, res) => {
   loggedIn = false;
   if (page && !page.isClosed()) await page.goto(WIN.url_login).catch(()=>{});
   res.json({ ok: true, message: 'Sesión WIN cerrada' });

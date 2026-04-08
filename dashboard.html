@@ -320,9 +320,19 @@ tr:hover td{background:rgba(255,255,255,.02)}
     <div class="result-card" id="result-card">
       <div class="result-header">
         <div class="result-icon" id="result-icon"><i id="result-icon-i" class="fas fa-clock"></i></div>
-        <div>
+        <div style="flex:1">
           <div class="result-title" id="result-title">Procesando...</div>
           <div class="result-sub" id="result-sub"></div>
+        </div>
+      </div>
+      <!-- Barra de progreso (visible solo durante procesamiento) -->
+      <div id="progreso-wrap" style="display:none;margin-top:1rem">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.5rem">
+          <span id="progreso-paso" style="font-size:.8rem;color:var(--primary-light);font-weight:500">Iniciando...</span>
+          <span id="progreso-num" style="font-size:.75rem;color:var(--text-muted)">0 / 11</span>
+        </div>
+        <div style="background:rgba(255,255,255,.07);border-radius:50px;height:6px;overflow:hidden">
+          <div id="progreso-bar" style="height:100%;background:linear-gradient(90deg,var(--primary),var(--accent));border-radius:50px;width:0%;transition:width .5s ease"></div>
         </div>
       </div>
       <div class="result-details" id="result-details"></div>
@@ -562,12 +572,29 @@ document.getElementById('validForm').addEventListener('submit',async(e)=>{
     ? `${via} ${numero}${hhuu?' - '+hhuu:''}, ${distrito}`
     : `${latitud}, ${longitud}`;
 
-  // Mostrar "procesando"
+  // Mostrar "procesando" con barra de progreso
   showResult('pending','Consultando WIN...','Automatización en curso, espera unos segundos...',[
     {label:'DNI',val:dni},
     {label:'Dirección',val:direccionResumen},
-    {label:'Estado',val:'⏳ Procesando en WIN...'},
   ]);
+  // Mostrar barra de progreso
+  document.getElementById('progreso-wrap').style.display='block';
+  document.getElementById('progreso-bar').style.width='0%';
+  document.getElementById('progreso-paso').textContent='Iniciando...';
+  document.getElementById('progreso-num').textContent='0 / 11';
+  // Iniciar polling de progreso
+  const progresoInterval = setInterval(async()=>{
+    try{
+      const r=await fetch(`${SERVER}/progreso`);
+      const p=await r.json();
+      if(p.activo){
+        const pct=Math.round((p.num/p.total)*100);
+        document.getElementById('progreso-bar').style.width=pct+'%';
+        document.getElementById('progreso-paso').textContent=`${p.icono} ${p.paso}`;
+        document.getElementById('progreso-num').textContent=`${p.num} / ${p.total}`;
+      }
+    }catch(_){}
+  },1200);
 
   // Guardar en Firestore con estado "pendiente"
   let docId='';
@@ -596,7 +623,7 @@ document.getElementById('validForm').addEventListener('submit',async(e)=>{
         // coords
         direccion: tipoActual==='coords' ? `${latitud},${longitud}` : '',
       }),
-      signal:AbortSignal.timeout(90000), // 90s — WIN puede tardar
+      signal:AbortSignal.timeout(180000), // 180s — cold start Render + automatización WIN
     });
     const data=await resp.json();
 
@@ -658,6 +685,8 @@ document.getElementById('validForm').addEventListener('submit',async(e)=>{
     ]);
   }
 
+  clearInterval(progresoInterval);
+  document.getElementById('progreso-wrap').style.display='none';
   btn.disabled=false; btn.classList.remove('loading');
   loadHistorial(); loadStats();
 });
