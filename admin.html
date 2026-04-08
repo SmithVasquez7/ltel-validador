@@ -1,0 +1,747 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<link rel="icon" type="image/x-icon" href="../assets/icons/SOFTKES.ico">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>L-TEL | Panel Administrador</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+<style>
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --primary:#0ea5e9;--primary-dark:#0284c7;--primary-light:#38bdf8;
+  --accent:#06b6d4;--sidebar-w:260px;
+  --dark:#0a1628;--bg:#0f1e35;--bg-card:rgba(255,255,255,0.04);
+  --text:#fff;--text-secondary:#94a3b8;--text-muted:#475569;
+  --border:rgba(255,255,255,0.07);--border-hover:rgba(14,165,233,0.35);
+  --danger:#ef4444;--success:#22c55e;--warning:#f59e0b;--purple:#8b5cf6;
+  --radius:10px;--radius-lg:14px;
+}
+html{scroll-behavior:smooth}
+body{font-family:'Inter',sans-serif;background:var(--dark);color:var(--text);min-height:100vh;display:flex;-webkit-font-smoothing:antialiased}
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:rgba(14,165,233,.25);border-radius:10px}
+
+/* SIDEBAR */
+.sidebar{width:var(--sidebar-w);min-height:100vh;background:rgba(10,22,40,0.97);border-right:1px solid var(--border);display:flex;flex-direction:column;position:fixed;top:0;left:0;z-index:100;backdrop-filter:blur(20px)}
+.sidebar-header{padding:1.5rem 1.25rem 1rem;border-bottom:1px solid var(--border)}
+.sidebar-logo{display:flex;align-items:center;gap:.85rem}
+.sidebar-logo-img{width:42px;height:42px;border-radius:10px;overflow:hidden;background:#fff;border:1px solid rgba(14,165,233,.2);flex-shrink:0}
+.sidebar-logo-img img{width:100%;height:100%;object-fit:contain;padding:4px}
+.sidebar-logo-text strong{font-size:.95rem;font-weight:700}
+.sidebar-logo-text span{font-size:.68rem;color:var(--text-secondary);letter-spacing:.03em}
+.admin-badge{display:inline-flex;align-items:center;gap:.35rem;margin-top:.4rem;padding:.2rem .65rem;background:rgba(139,92,246,.15);border:1px solid rgba(139,92,246,.3);border-radius:50px;font-size:.65rem;color:#c4b5fd;font-weight:600;letter-spacing:.04em}
+.sidebar-nav{flex:1;padding:1rem 0;overflow-y:auto}
+.nav-section{padding:.5rem 1.25rem .25rem;font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--text-muted)}
+.nav-link{display:flex;align-items:center;gap:.75rem;padding:.65rem 1.25rem;font-size:.85rem;font-weight:500;color:var(--text-secondary);text-decoration:none;transition:all .18s;border-left:3px solid transparent;cursor:pointer;user-select:none}
+.nav-link:hover{color:#fff;background:rgba(255,255,255,.04)}
+.nav-link.active{color:var(--primary-light);background:rgba(14,165,233,.08);border-left-color:var(--primary)}
+.nav-link i{width:18px;text-align:center;font-size:.9rem}
+.sidebar-footer{padding:1rem 1.25rem;border-top:1px solid var(--border)}
+.user-info{display:flex;align-items:center;gap:.75rem;margin-bottom:.85rem}
+.user-avatar{width:36px;height:36px;background:linear-gradient(135deg,var(--purple),#6d28d9);border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:.85rem;flex-shrink:0}
+.user-name{font-size:.85rem;font-weight:600}
+.user-role{font-size:.7rem;color:var(--text-secondary);margin-top:.1rem}
+.btn-logout{width:100%;padding:.65rem;background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.2);border-radius:var(--radius);color:#fca5a5;font-size:.82rem;font-weight:500;cursor:pointer;transition:all .18s;display:flex;align-items:center;justify-content:center;gap:.5rem}
+.btn-logout:hover{background:rgba(239,68,68,.15);border-color:rgba(239,68,68,.4)}
+
+/* MAIN */
+.main{margin-left:var(--sidebar-w);flex:1;display:flex;flex-direction:column;min-height:100vh}
+.topbar{background:rgba(10,22,40,0.8);backdrop-filter:blur(20px);border-bottom:1px solid var(--border);padding:.85rem 1.75rem;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:50}
+.topbar-title{font-size:1.05rem;font-weight:700}
+.topbar-sub{font-size:.78rem;color:var(--text-secondary);margin-top:.1rem}
+.server-status{display:flex;align-items:center;gap:.5rem;font-size:.78rem;padding:.4rem .85rem;border-radius:50px;border:1px solid var(--border);cursor:pointer;transition:all .2s}
+.server-status.online{background:rgba(34,197,94,.07);border-color:rgba(34,197,94,.25);color:#86efac}
+.server-status.offline{background:rgba(239,68,68,.07);border-color:rgba(239,68,68,.25);color:#fca5a5}
+.server-status.checking{background:rgba(245,158,11,.07);border-color:rgba(245,158,11,.25);color:#fcd34d}
+.status-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.server-status.online .status-dot{background:#22c55e;box-shadow:0 0 6px #22c55e}
+.server-status.offline .status-dot{background:#ef4444}
+.server-status.checking .status-dot{background:#f59e0b;animation:pulse 1s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+.content{flex:1;padding:1.75rem;overflow-y:auto}
+
+/* SECTIONS */
+.section{display:none}
+.section.active{display:block}
+
+/* STATS */
+.stats-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:1rem;margin-bottom:1.75rem}
+.stat-card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-lg);padding:1.25rem;position:relative;overflow:hidden;transition:border-color .2s}
+.stat-card:hover{border-color:var(--border-hover)}
+.stat-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;border-radius:var(--radius-lg) var(--radius-lg) 0 0}
+.stat-card.blue::before{background:linear-gradient(90deg,var(--primary),var(--accent))}
+.stat-card.green::before{background:linear-gradient(90deg,var(--success),#16a34a)}
+.stat-card.red::before{background:linear-gradient(90deg,var(--danger),#dc2626)}
+.stat-card.yellow::before{background:linear-gradient(90deg,var(--warning),#d97706)}
+.stat-card.purple::before{background:linear-gradient(90deg,var(--purple),#6d28d9)}
+.stat-label{font-size:.72rem;text-transform:uppercase;letter-spacing:.08em;color:var(--text-muted);font-weight:600;margin-bottom:.5rem}
+.stat-val{font-size:2rem;font-weight:800;line-height:1}
+.stat-sub{font-size:.75rem;color:var(--text-secondary);margin-top:.35rem}
+.stat-icon{position:absolute;right:1.25rem;top:1.25rem;font-size:1.6rem;opacity:.12}
+
+/* CARDS */
+.card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-lg);padding:1.5rem;margin-bottom:1.5rem}
+.card-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:1.25rem;flex-wrap:gap}
+.card-title{font-size:.95rem;font-weight:700;display:flex;align-items:center;gap:.6rem}
+.card-title i{color:var(--primary);font-size:.9rem}
+
+/* TABLE */
+.tbl-wrap{overflow-x:auto;margin:-1.5rem;padding:0 1.5rem 1.5rem}
+table{width:100%;border-collapse:collapse;min-width:700px}
+th{font-size:.7rem;text-transform:uppercase;letter-spacing:.08em;color:var(--text-muted);font-weight:600;padding:.75rem 1rem;text-align:left;border-bottom:1px solid var(--border);white-space:nowrap}
+td{padding:.8rem 1rem;font-size:.85rem;border-bottom:1px solid rgba(255,255,255,.04);vertical-align:middle}
+tr:hover td{background:rgba(255,255,255,.02)}
+tr:last-child td{border-bottom:none}
+.badge{display:inline-flex;align-items:center;gap:.35rem;padding:.25rem .65rem;border-radius:50px;font-size:.72rem;font-weight:600;white-space:nowrap}
+.badge-success{background:rgba(34,197,94,.12);color:#86efac;border:1px solid rgba(34,197,94,.2)}
+.badge-error{background:rgba(239,68,68,.12);color:#fca5a5;border:1px solid rgba(239,68,68,.2)}
+.badge-pending{background:rgba(245,158,11,.12);color:#fcd34d;border:1px solid rgba(245,158,11,.2)}
+.badge-warning{background:rgba(245,158,11,.12);color:#fcd34d;border:1px solid rgba(245,158,11,.2)}
+
+/* FILTERS */
+.filters{display:flex;gap:.75rem;margin-bottom:1.25rem;flex-wrap:wrap;align-items:center}
+.filter-select,.filter-input{background:rgba(255,255,255,.05);border:1px solid var(--border);border-radius:var(--radius);color:#fff;font-size:.82rem;padding:.55rem .85rem;font-family:'Inter',sans-serif;outline:none;transition:border-color .2s;min-width:140px}
+.filter-select:focus,.filter-input:focus{border-color:var(--primary)}
+.filter-select option{background:#0f1e35;color:#fff}
+.btn-filter{padding:.55rem 1rem;background:rgba(14,165,233,.1);border:1px solid rgba(14,165,233,.25);border-radius:var(--radius);color:var(--primary-light);font-size:.82rem;font-weight:500;cursor:pointer;transition:all .2s;display:flex;align-items:center;gap:.4rem;font-family:'Inter',sans-serif}
+.btn-filter:hover{background:rgba(14,165,233,.2)}
+
+/* WORKERS GRID */
+.workers-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:1rem}
+.worker-card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-lg);padding:1.25rem;transition:border-color .2s}
+.worker-card:hover{border-color:var(--border-hover)}
+.worker-header{display:flex;align-items:center;gap:.85rem;margin-bottom:1rem}
+.worker-avatar{width:44px;height:44px;border-radius:50%;background:linear-gradient(135deg,var(--primary),var(--accent));display:flex;align-items:center;justify-content:center;font-weight:700;font-size:1.1rem;flex-shrink:0}
+.worker-name{font-size:.95rem;font-weight:600}
+.worker-user{font-size:.75rem;color:var(--text-secondary);margin-top:.15rem}
+.worker-stats{display:grid;grid-template-columns:1fr 1fr 1fr;gap:.5rem}
+.wstat{text-align:center;background:rgba(255,255,255,.03);border-radius:8px;padding:.6rem .5rem}
+.wstat-val{font-size:1.25rem;font-weight:700}
+.wstat-label{font-size:.65rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-top:.2rem}
+.wstat.green .wstat-val{color:#86efac}
+.wstat.red .wstat-val{color:#fca5a5}
+.wstat.blue .wstat-val{color:var(--primary-light)}
+
+/* WIN CONFIG */
+.config-grid{display:grid;grid-template-columns:1fr 1fr;gap:1.5rem}
+@media(max-width:700px){.config-grid{grid-template-columns:1fr}}
+.form-group{margin-bottom:1rem}
+.form-label{display:block;font-size:.78rem;font-weight:600;color:rgba(255,255,255,.6);margin-bottom:.45rem;letter-spacing:.3px}
+.form-input-wrap{position:relative}
+.form-icon{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:rgba(255,255,255,.25);font-size:.82rem;pointer-events:none}
+.form-input{width:100%;padding:.8rem 1rem .8rem 2.3rem;background:rgba(255,255,255,.05);border:1px solid var(--border);border-radius:var(--radius);color:#fff;font-family:'Inter',sans-serif;font-size:.88rem;outline:none;transition:all .2s}
+.form-input::placeholder{color:rgba(255,255,255,.2)}
+.form-input:focus{border-color:var(--primary);background:rgba(14,165,233,.06);box-shadow:0 0 0 3px rgba(14,165,233,.12)}
+.toggle-pass{position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;color:rgba(255,255,255,.3);cursor:pointer;padding:4px;transition:color .2s;font-size:.85rem}
+.toggle-pass:hover{color:rgba(255,255,255,.7)}
+.btn-save{padding:.8rem 1.5rem;background:linear-gradient(135deg,var(--primary),var(--primary-dark));color:#fff;border:none;border-radius:var(--radius);font-family:'Inter',sans-serif;font-size:.88rem;font-weight:600;cursor:pointer;transition:all .2s;display:flex;align-items:center;gap:.5rem;box-shadow:0 4px 15px rgba(14,165,233,.25)}
+.btn-save:hover{transform:translateY(-1px);box-shadow:0 6px 20px rgba(14,165,233,.35)}
+.btn-save:disabled{opacity:.6;cursor:not-allowed;transform:none}
+.alert-box{padding:.9rem 1.1rem;border-radius:var(--radius);font-size:.82rem;display:none;align-items:center;gap:.6rem;margin-top:1rem}
+.alert-box.show{display:flex}
+.alert-box.success{background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.25);color:#86efac}
+.alert-box.error{background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.25);color:#fca5a5}
+.info-box{background:rgba(14,165,233,.07);border:1px solid rgba(14,165,233,.2);border-radius:var(--radius);padding:1rem 1.1rem;font-size:.82rem;color:var(--text-secondary);line-height:1.6;margin-bottom:1.25rem}
+.info-box strong{color:var(--primary-light)}
+.last-update{font-size:.75rem;color:var(--text-muted);margin-top:.5rem;display:flex;align-items:center;gap:.4rem}
+
+/* Empty state */
+.empty{text-align:center;padding:3rem 1.5rem;color:var(--text-muted)}
+.empty i{font-size:2.5rem;margin-bottom:.75rem;opacity:.4}
+.empty p{font-size:.88rem}
+
+/* Loading */
+.loading-row td{text-align:center;padding:2rem;color:var(--text-muted);font-size:.85rem}
+</style>
+</head>
+<body>
+
+<!-- SIDEBAR -->
+<aside class="sidebar">
+  <div class="sidebar-header">
+    <div class="sidebar-logo">
+      <div class="sidebar-logo-img"><img src="../assets/icons/ltel.jpeg" alt="L-TEL"></div>
+      <div class="sidebar-logo-text">
+        <strong>L-TEL Admin</strong>
+        <span>Panel de Administración</span>
+        <div class="admin-badge"><i class="fas fa-crown"></i> Administrador</div>
+      </div>
+    </div>
+  </div>
+  <nav class="sidebar-nav">
+    <div class="nav-section">Monitoreo</div>
+    <div class="nav-link active" onclick="showSection('dashboard',this)">
+      <i class="fas fa-chart-bar"></i> Dashboard
+    </div>
+    <div class="nav-link" onclick="showSection('historial',this)">
+      <i class="fas fa-history"></i> Historial Completo
+    </div>
+    <div class="nav-link" onclick="showSection('trabajadores',this)">
+      <i class="fas fa-users"></i> Trabajadores
+    </div>
+    <div class="nav-section">Sistema</div>
+    <div class="nav-link" onclick="showSection('configuracion',this)">
+      <i class="fas fa-cog"></i> Credenciales WIN
+    </div>
+    <div class="nav-link" onclick="window.location.href='dashboard.html'">
+      <i class="fas fa-exchange-alt"></i> Ir a Validador
+    </div>
+  </nav>
+  <div class="sidebar-footer">
+    <div class="user-info">
+      <div class="user-avatar" id="user-avatar">A</div>
+      <div>
+        <div class="user-name" id="user-name">Admin</div>
+        <div class="user-role">Administrador</div>
+      </div>
+    </div>
+    <button class="btn-logout" onclick="logout()">
+      <i class="fas fa-sign-out-alt"></i> Cerrar Sesión
+    </button>
+  </div>
+</aside>
+
+<!-- MAIN -->
+<main class="main">
+  <div class="topbar">
+    <div>
+      <div class="topbar-title" id="topbar-title">Dashboard</div>
+      <div class="topbar-sub" id="topbar-sub">Resumen general del sistema</div>
+    </div>
+    <div class="server-status checking" id="server-status" onclick="checkServer()" title="Clic para verificar estado del servidor">
+      <div class="status-dot"></div>
+      <span id="server-status-text">Verificando...</span>
+    </div>
+  </div>
+
+  <div class="content">
+
+    <!-- ── DASHBOARD ── -->
+    <section class="section active" id="sec-dashboard">
+      <div class="stats-grid">
+        <div class="stat-card blue">
+          <div class="stat-label">Total hoy</div>
+          <div class="stat-val" id="st-total">—</div>
+          <div class="stat-sub" id="st-total-sub">validaciones</div>
+          <i class="fas fa-bolt stat-icon"></i>
+        </div>
+        <div class="stat-card green">
+          <div class="stat-label">Aprobados</div>
+          <div class="stat-val" id="st-aprobados">—</div>
+          <div class="stat-sub" id="st-aprobados-sub">score ≥ 301</div>
+          <i class="fas fa-check-circle stat-icon"></i>
+        </div>
+        <div class="stat-card red">
+          <div class="stat-label">Rechazados / Sin cob.</div>
+          <div class="stat-val" id="st-rechazados">—</div>
+          <div class="stat-sub">no aptos</div>
+          <i class="fas fa-times-circle stat-icon"></i>
+        </div>
+        <div class="stat-card yellow">
+          <div class="stat-label">Tasa aprobación</div>
+          <div class="stat-val" id="st-tasa">—</div>
+          <div class="stat-sub">del total hoy</div>
+          <i class="fas fa-percent stat-icon"></i>
+        </div>
+        <div class="stat-card purple">
+          <div class="stat-label">Operadores activos hoy</div>
+          <div class="stat-val" id="st-operadores">—</div>
+          <div class="stat-sub">con validaciones</div>
+          <i class="fas fa-users stat-icon"></i>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title"><i class="fas fa-clock"></i> Últimas 20 validaciones</div>
+          <button class="btn-filter" onclick="loadDashboard()"><i class="fas fa-sync-alt"></i> Actualizar</button>
+        </div>
+        <div class="tbl-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Operador</th>
+                <th>DNI</th>
+                <th>Dirección</th>
+                <th>Score</th>
+                <th>Resultado</th>
+                <th>Hora</th>
+              </tr>
+            </thead>
+            <tbody id="tbl-recientes">
+              <tr class="loading-row"><td colspan="6"><i class="fas fa-spinner fa-spin"></i> Cargando...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── HISTORIAL ── -->
+    <section class="section" id="sec-historial">
+      <div class="filters">
+        <select class="filter-select" id="f-operador">
+          <option value="">Todos los operadores</option>
+        </select>
+        <select class="filter-select" id="f-resultado">
+          <option value="">Todos los resultados</option>
+          <option value="aprobado">Aprobado</option>
+          <option value="rechazado">Rechazado (score bajo)</option>
+          <option value="sin_cobertura">Sin cobertura</option>
+          <option value="pendiente">Pendiente</option>
+        </select>
+        <input type="date" class="filter-input" id="f-fecha" title="Filtrar por fecha">
+        <button class="btn-filter" onclick="loadHistorial()"><i class="fas fa-search"></i> Buscar</button>
+        <button class="btn-filter" onclick="limpiarFiltros()"><i class="fas fa-times"></i> Limpiar</button>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title"><i class="fas fa-list"></i> Registro de validaciones <span id="hist-count" style="font-size:.75rem;color:var(--text-muted);font-weight:400"></span></div>
+          <button class="btn-filter" onclick="loadHistorial()"><i class="fas fa-sync-alt"></i> Actualizar</button>
+        </div>
+        <div class="tbl-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Operador</th>
+                <th>DNI Cliente</th>
+                <th>Dirección</th>
+                <th>Cobertura</th>
+                <th>Score</th>
+                <th>Resultado</th>
+                <th>Fecha/Hora</th>
+              </tr>
+            </thead>
+            <tbody id="tbl-historial">
+              <tr class="loading-row"><td colspan="8"><i class="fas fa-spinner fa-spin"></i> Cargando...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── TRABAJADORES ── -->
+    <section class="section" id="sec-trabajadores">
+      <div class="card" style="margin-bottom:1.5rem">
+        <div class="card-header">
+          <div class="card-title"><i class="fas fa-users"></i> Estadísticas por trabajador</div>
+          <button class="btn-filter" onclick="loadTrabajadores()"><i class="fas fa-sync-alt"></i> Actualizar</button>
+        </div>
+        <div class="tbl-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Trabajador</th>
+                <th>Usuario</th>
+                <th>Total</th>
+                <th>Aprobados</th>
+                <th>Rechazados</th>
+                <th>Sin cob.</th>
+                <th>Tasa aprob.</th>
+                <th>Última actividad</th>
+              </tr>
+            </thead>
+            <tbody id="tbl-trabajadores">
+              <tr class="loading-row"><td colspan="8"><i class="fas fa-spinner fa-spin"></i> Cargando...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── CONFIGURACIÓN WIN ── -->
+    <section class="section" id="sec-configuracion">
+      <div class="info-box">
+        <strong><i class="fas fa-info-circle"></i> ¿Cómo funciona?</strong><br>
+        Las credenciales WIN se guardan en el servidor (Render). El sistema las usa para automatizar la plataforma
+        <strong>appwinforce.win.pe</strong>. Si WIN cierra la sesión automáticamente, el servidor volverá a ingresar
+        con estas credenciales sin que el operador tenga que hacer nada.
+      </div>
+
+      <div class="config-grid">
+        <div class="card">
+          <div class="card-title" style="margin-bottom:1.25rem"><i class="fas fa-key"></i> Credenciales de acceso WIN</div>
+
+          <div class="form-group">
+            <label class="form-label">Usuario WIN (correo)</label>
+            <div class="form-input-wrap">
+              <i class="fas fa-envelope form-icon"></i>
+              <input type="text" id="win-usuario" class="form-input" placeholder="usuario@ltel.com">
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Contraseña WIN</label>
+            <div class="form-input-wrap">
+              <i class="fas fa-lock form-icon"></i>
+              <input type="password" id="win-pass" class="form-input" placeholder="••••••••">
+              <button type="button" class="toggle-pass" onclick="toggleWinPass()">
+                <i class="fas fa-eye" id="win-eye"></i>
+              </button>
+            </div>
+          </div>
+
+          <button class="btn-save" id="btn-guardar-win" onclick="guardarCredsWIN()">
+            <i class="fas fa-save"></i> Guardar en servidor
+          </button>
+
+          <div class="alert-box success" id="alert-win-ok">
+            <i class="fas fa-check-circle"></i> Credenciales guardadas correctamente. El servidor usará estas al próximo ingreso.
+          </div>
+          <div class="alert-box error" id="alert-win-err">
+            <i class="fas fa-exclamation-circle"></i> <span id="alert-win-err-text">Error al guardar.</span>
+          </div>
+
+          <div class="last-update" id="last-update-win">
+            <i class="fas fa-clock"></i> <span>Sin configurar</span>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title" style="margin-bottom:1.25rem"><i class="fas fa-server"></i> Estado del servidor</div>
+
+          <div id="server-detail" style="font-size:.85rem;line-height:1.9">
+            <div style="display:flex;justify-content:space-between;border-bottom:1px solid var(--border);padding:.5rem 0">
+              <span style="color:var(--text-muted)">Estado</span>
+              <span id="srv-estado">Verificando...</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;border-bottom:1px solid var(--border);padding:.5rem 0">
+              <span style="color:var(--text-muted)">URL</span>
+              <span style="color:var(--primary-light);font-size:.75rem" id="srv-url">—</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;border-bottom:1px solid var(--border);padding:.5rem 0">
+              <span style="color:var(--text-muted)">Sesión WIN</span>
+              <span id="srv-sesion">—</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;padding:.5rem 0">
+              <span style="color:var(--text-muted)">Credenciales</span>
+              <span id="srv-creds">—</span>
+            </div>
+          </div>
+
+          <button class="btn-save" style="margin-top:1.25rem;background:linear-gradient(135deg,#475569,#334155)" onclick="checkServer()">
+            <i class="fas fa-sync-alt"></i> Verificar servidor
+          </button>
+        </div>
+      </div>
+    </section>
+
+  </div>
+</main>
+
+<script>
+// ── CONFIG FIREBASE ──────────────────────────────────────────────
+const firebaseConfig={
+  apiKey:"AIzaSyDre3Wdt__AKKP2NGiv-I5ksqscoVPDsho",
+  authDomain:"softkes-ssi.firebaseapp.com",
+  projectId:"softkes-ssi",
+  storageBucket:"softkes-ssi.firebasestorage.app",
+  messagingSenderId:"949401432052",
+  appId:"1:949401432052:web:131984f96192cf9ff493a1"
+};
+firebase.initializeApp(firebaseConfig);
+const db=firebase.firestore();
+
+const SERVER='https://ltel-validador-win.onrender.com';
+
+// ── AUTH CHECK ───────────────────────────────────────────────────
+const _sess=sessionStorage.getItem('validadorUser');
+if(!_sess){window.location.href='login.html';}
+const session=JSON.parse(_sess||'{}');
+if(session.rol!=='admin'){
+  alert('Acceso restringido. Solo administradores.');
+  window.location.href='dashboard.html';
+}
+document.getElementById('user-name').textContent=session.nombre||session.usuario;
+document.getElementById('user-avatar').textContent=(session.nombre||session.usuario).charAt(0).toUpperCase();
+function logout(){sessionStorage.removeItem('validadorUser');window.location.href='login.html';}
+
+// ── NAVEGACIÓN ───────────────────────────────────────────────────
+const sectionMeta={
+  dashboard:{title:'Dashboard',sub:'Resumen general del sistema'},
+  historial:{title:'Historial Completo',sub:'Todas las validaciones del equipo'},
+  trabajadores:{title:'Trabajadores',sub:'Estadísticas por operador'},
+  configuracion:{title:'Credenciales WIN',sub:'Configuración del sistema de automatización'},
+};
+function showSection(id,link){
+  document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
+  document.querySelectorAll('.nav-link').forEach(l=>l.classList.remove('active'));
+  document.getElementById('sec-'+id).classList.add('active');
+  link.classList.add('active');
+  document.getElementById('topbar-title').textContent=sectionMeta[id].title;
+  document.getElementById('topbar-sub').textContent=sectionMeta[id].sub;
+  if(id==='dashboard')loadDashboard();
+  if(id==='historial')loadHistorial();
+  if(id==='trabajadores')loadTrabajadores();
+}
+
+// ── BADGES ───────────────────────────────────────────────────────
+const badgeMap={
+  aprobado:     '<span class="badge badge-success"><i class="fas fa-check-circle"></i> Aprobado</span>',
+  rechazado:    '<span class="badge badge-error"><i class="fas fa-user-times"></i> Score bajo</span>',
+  sin_cobertura:'<span class="badge badge-error"><i class="fas fa-times"></i> Sin cobertura</span>',
+  pendiente:    '<span class="badge badge-pending"><i class="fas fa-clock"></i> Pendiente</span>',
+  con_cobertura:'<span class="badge badge-success"><i class="fas fa-wifi"></i> Con cobertura</span>',
+};
+
+// ── DASHBOARD ────────────────────────────────────────────────────
+async function loadDashboard(){
+  const hoy=new Date();hoy.setHours(0,0,0,0);
+  const snap=await db.collection('validaciones')
+    .where('fechaISO','>=',hoy.toISOString())
+    .orderBy('fechaISO','desc')
+    .limit(100).get().catch(()=>null);
+
+  if(!snap){return;}
+  let total=0,aprobados=0,rechazados=0;
+  const operadores=new Set();
+  const filas=[];
+
+  snap.forEach(doc=>{
+    const d=doc.data();total++;
+    if(d.resultado==='aprobado'||d.resultado==='con_cobertura')aprobados++;
+    else if(d.resultado!=='pendiente')rechazados++;
+    operadores.add(d.operador||d.usuario||'—');
+    filas.push(d);
+  });
+
+  document.getElementById('st-total').textContent=total;
+  document.getElementById('st-aprobados').textContent=aprobados;
+  document.getElementById('st-rechazados').textContent=rechazados;
+  document.getElementById('st-tasa').textContent=total?Math.round(aprobados/total*100)+'%':'0%';
+  document.getElementById('st-operadores').textContent=operadores.size;
+
+  const tbody=document.getElementById('tbl-recientes');
+  if(!filas.length){tbody.innerHTML='<tr class="loading-row"><td colspan="6">No hay validaciones hoy.</td></tr>';return;}
+  tbody.innerHTML=filas.slice(0,20).map(d=>{
+    const hora=d.fechaISO?new Date(d.fechaISO).toLocaleTimeString('es-PE',{hour:'2-digit',minute:'2-digit'}):'—';
+    const score=d.scoreNum!=null?`<span style="font-weight:700;color:${d.aprobado?'#86efac':'#fca5a5'}">${d.scoreNum}</span>`:'—';
+    return `<tr>
+      <td><span style="font-weight:600">${d.operadorNombre||d.operador||'—'}</span></td>
+      <td><code style="background:rgba(255,255,255,.06);padding:2px 6px;border-radius:4px;font-size:.8rem">${d.dni||'—'}</code></td>
+      <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text-secondary)">${d.direccion||'—'}</td>
+      <td>${score}</td>
+      <td>${badgeMap[d.resultado]||badgeMap.pendiente}</td>
+      <td style="color:var(--text-muted)">${hora}</td>
+    </tr>`;
+  }).join('');
+}
+
+// ── HISTORIAL ────────────────────────────────────────────────────
+let operadoresList=[];
+async function loadHistorial(){
+  const tbody=document.getElementById('tbl-historial');
+  tbody.innerHTML='<tr class="loading-row"><td colspan="8"><i class="fas fa-spinner fa-spin"></i> Cargando...</td></tr>';
+
+  const fOp=document.getElementById('f-operador').value;
+  const fRes=document.getElementById('f-resultado').value;
+  const fFecha=document.getElementById('f-fecha').value;
+
+  let q=db.collection('validaciones').orderBy('fechaISO','desc');
+
+  if(fOp)q=q.where('operador','==',fOp);
+  if(fRes)q=q.where('resultado','==',fRes);
+  if(fFecha){
+    const ini=new Date(fFecha+'T00:00:00');
+    const fin=new Date(fFecha+'T23:59:59');
+    q=q.where('fechaISO','>=',ini.toISOString()).where('fechaISO','<=',fin.toISOString());
+  }
+
+  const snap=await q.limit(200).get().catch(()=>null);
+  if(!snap){tbody.innerHTML='<tr class="loading-row"><td colspan="8">Error al cargar datos.</td></tr>';return;}
+
+  document.getElementById('hist-count').textContent=`— ${snap.size} registros`;
+
+  if(snap.empty){tbody.innerHTML='<tr class="loading-row"><td colspan="8">No hay resultados para los filtros aplicados.</td></tr>';return;}
+
+  // Poblar filtro de operadores
+  const ops=new Set();
+  snap.forEach(doc=>ops.add(doc.data().operador||''));
+  const sel=document.getElementById('f-operador');
+  const opActual=sel.value;
+  sel.innerHTML='<option value="">Todos los operadores</option>';
+  [...ops].filter(Boolean).forEach(op=>{
+    const o=document.createElement('option');o.value=op;o.textContent=op;
+    if(op===opActual)o.selected=true;
+    sel.appendChild(o);
+  });
+
+  let i=0;
+  tbody.innerHTML=snap.docs.map(doc=>{
+    const d=doc.data();i++;
+    const fecha=d.fechaISO?new Date(d.fechaISO).toLocaleString('es-PE',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}):'—';
+    const score=d.scoreNum!=null?`<span style="font-weight:700;color:${d.aprobado?'#86efac':'#fca5a5'}">${d.scoreNum}</span>`:'—';
+    const cob=d.tieneCobertura!=null?(d.tieneCobertura?'<span style="color:#86efac">✓</span>':'<span style="color:#fca5a5">✗</span>'):'—';
+    return `<tr>
+      <td style="color:var(--text-muted)">${i}</td>
+      <td><span style="font-weight:600">${d.operadorNombre||d.operador||'—'}</span></td>
+      <td><code style="background:rgba(255,255,255,.06);padding:2px 6px;border-radius:4px;font-size:.8rem">${d.dni||'—'}</code></td>
+      <td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text-secondary)">${d.direccion||'—'}</td>
+      <td>${cob}</td>
+      <td>${score}</td>
+      <td>${badgeMap[d.resultado]||badgeMap.pendiente}</td>
+      <td style="color:var(--text-muted);font-size:.78rem">${fecha}</td>
+    </tr>`;
+  }).join('');
+}
+
+function limpiarFiltros(){
+  document.getElementById('f-operador').value='';
+  document.getElementById('f-resultado').value='';
+  document.getElementById('f-fecha').value='';
+  loadHistorial();
+}
+
+// ── TRABAJADORES ─────────────────────────────────────────────────
+async function loadTrabajadores(){
+  const tbody=document.getElementById('tbl-trabajadores');
+  tbody.innerHTML='<tr class="loading-row"><td colspan="8"><i class="fas fa-spinner fa-spin"></i> Cargando...</td></tr>';
+
+  // Obtener todas las validaciones
+  const snap=await db.collection('validaciones').orderBy('fechaISO','desc').get().catch(()=>null);
+  if(!snap){tbody.innerHTML='<tr class="loading-row"><td colspan="8">Error al cargar datos.</td></tr>';return;}
+
+  // Agrupar por operador
+  const map={};
+  snap.forEach(doc=>{
+    const d=doc.data();
+    const key=d.operador||'desconocido';
+    if(!map[key])map[key]={nombre:d.operadorNombre||key,usuario:key,total:0,aprobados:0,rechazados:0,sinCob:0,ultima:''};
+    map[key].total++;
+    if(d.resultado==='aprobado'||d.resultado==='con_cobertura')map[key].aprobados++;
+    else if(d.resultado==='sin_cobertura')map[key].sinCob++;
+    else if(d.resultado==='rechazado')map[key].rechazados++;
+    if(!map[key].ultima&&d.fechaISO)map[key].ultima=d.fechaISO;
+  });
+
+  const workers=Object.values(map).sort((a,b)=>b.total-a.total);
+  if(!workers.length){tbody.innerHTML='<tr class="loading-row"><td colspan="8">No hay datos registrados aún.</td></tr>';return;}
+
+  tbody.innerHTML=workers.map(w=>{
+    const tasa=w.total?Math.round(w.aprobados/w.total*100):0;
+    const ultima=w.ultima?new Date(w.ultima).toLocaleString('es-PE',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}):'—';
+    const taColor=tasa>=60?'#86efac':tasa>=30?'#fcd34d':'#fca5a5';
+    return `<tr>
+      <td><div style="display:flex;align-items:center;gap:.65rem">
+        <div style="width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,var(--primary),var(--accent));display:flex;align-items:center;justify-content:center;font-weight:700;font-size:.85rem;flex-shrink:0">${w.nombre.charAt(0).toUpperCase()}</div>
+        <span style="font-weight:600">${w.nombre}</span>
+      </div></td>
+      <td style="color:var(--text-secondary)">${w.usuario}</td>
+      <td><strong>${w.total}</strong></td>
+      <td style="color:#86efac"><strong>${w.aprobados}</strong></td>
+      <td style="color:#fca5a5"><strong>${w.rechazados}</strong></td>
+      <td style="color:#fcd34d"><strong>${w.sinCob}</strong></td>
+      <td><span style="font-weight:700;color:${taColor}">${tasa}%</span></td>
+      <td style="color:var(--text-muted);font-size:.78rem">${ultima}</td>
+    </tr>`;
+  }).join('');
+}
+
+// ── CONFIGURACIÓN WIN ────────────────────────────────────────────
+function toggleWinPass(){
+  const inp=document.getElementById('win-pass');
+  const ico=document.getElementById('win-eye');
+  const show=inp.type==='password';
+  inp.type=show?'text':'password';
+  ico.className=show?'fas fa-eye-slash':'fas fa-eye';
+}
+
+async function guardarCredsWIN(){
+  const u=document.getElementById('win-usuario').value.trim();
+  const p=document.getElementById('win-pass').value.trim();
+  if(!u||!p){showAlertWin('error','Completa usuario y contraseña WIN.');return;}
+
+  const btn=document.getElementById('btn-guardar-win');
+  btn.disabled=true;btn.innerHTML='<i class="fas fa-spinner fa-spin"></i> Guardando...';
+
+  // Ocultar alertas previas
+  document.getElementById('alert-win-ok').classList.remove('show');
+  document.getElementById('alert-win-err').classList.remove('show');
+
+  try{
+    const resp=await fetch(`${SERVER}/configurar`,{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({usuario:u,password:p}),
+      signal:AbortSignal.timeout(10000),
+    });
+    const data=await resp.json();
+    if(data.ok){
+      showAlertWin('success');
+      // Guardar timestamp en Firestore
+      await db.collection('configuracion').doc('win').set({
+        actualizadoPor:session.usuario,
+        actualizadoEn:new Date().toISOString(),
+        usuarioConfig:u, // guardar usuario (no contraseña)
+      }).catch(()=>{});
+      loadLastWinUpdate();
+    } else {
+      showAlertWin('error',data.error||'Error desconocido.');
+    }
+  }catch(err){
+    showAlertWin('error','No se pudo conectar al servidor. ¿Está en línea?');
+  }
+  btn.disabled=false;btn.innerHTML='<i class="fas fa-save"></i> Guardar en servidor';
+}
+
+function showAlertWin(type,msg){
+  if(type==='success'){
+    document.getElementById('alert-win-ok').classList.add('show');
+  } else {
+    document.getElementById('alert-win-err-text').textContent=msg;
+    document.getElementById('alert-win-err').classList.add('show');
+  }
+}
+
+async function loadLastWinUpdate(){
+  const doc=await db.collection('configuracion').doc('win').get().catch(()=>null);
+  if(doc&&doc.exists){
+    const d=doc.data();
+    const fecha=new Date(d.actualizadoEn).toLocaleString('es-PE');
+    document.getElementById('last-update-win').innerHTML=
+      `<i class="fas fa-clock"></i> Última actualización: <strong>${fecha}</strong> por <strong>${d.actualizadoPor}</strong>`
+      +(d.usuarioConfig?` (usuario: <strong>${d.usuarioConfig}</strong>)`:'');
+  }
+}
+
+// ── ESTADO DEL SERVIDOR ──────────────────────────────────────────
+async function checkServer(){
+  const el=document.getElementById('server-status');
+  const txt=document.getElementById('server-status-text');
+  el.className='server-status checking';
+  txt.textContent='Verificando...';
+
+  document.getElementById('srv-url').textContent=SERVER;
+
+  try{
+    const resp=await fetch(`${SERVER}/estado`,{signal:AbortSignal.timeout(8000)});
+    const data=await resp.json();
+    el.className='server-status online';
+    txt.textContent='En línea';
+    document.getElementById('srv-estado').innerHTML='<span style="color:#86efac">✓ Online</span>';
+    document.getElementById('srv-sesion').innerHTML=data.loggedIn
+      ?'<span style="color:#86efac">✓ Sesión activa</span>'
+      :'<span style="color:#fcd34d">⚠ Sin sesión</span>';
+    document.getElementById('srv-creds').innerHTML=data.credsCargadas
+      ?'<span style="color:#86efac">✓ Configuradas</span>'
+      :'<span style="color:#fca5a5">✗ Sin credenciales</span>';
+  }catch(err){
+    el.className='server-status offline';
+    txt.textContent='Sin conexión';
+    document.getElementById('srv-estado').innerHTML='<span style="color:#fca5a5">✗ Offline</span>';
+    document.getElementById('srv-sesion').textContent='—';
+    document.getElementById('srv-creds').textContent='—';
+  }
+}
+
+// ── INIT ─────────────────────────────────────────────────────────
+loadDashboard();
+loadLastWinUpdate();
+checkServer();
+setInterval(checkServer, 60000); // verificar cada 60s
+</script>
+</body>
+</html>

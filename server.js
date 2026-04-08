@@ -77,16 +77,24 @@ const WIN = {
   }
 };
 
-// Cargar credenciales desde archivo
+// Cargar credenciales: primero archivo local, luego variables de entorno (Render)
 const CREDS_FILE = path.join(__dirname, 'win-credentials.json');
 function loadCreds() {
+  // 1. Intentar desde archivo (actualizado por /configurar)
   if (fs.existsSync(CREDS_FILE)) {
     try {
       const c = JSON.parse(fs.readFileSync(CREDS_FILE, 'utf8'));
       WIN.creds.usuario  = c.usuario  || '';
       WIN.creds.password = c.password || '';
-      console.log('✓ Credenciales WIN cargadas');
+      console.log('✓ Credenciales WIN cargadas desde archivo');
+      return;
     } catch(e) { console.warn('⚠ Error leyendo win-credentials.json'); }
+  }
+  // 2. Fallback: variables de entorno (útil en Render si se configura una vez)
+  if (process.env.WIN_USUARIO && process.env.WIN_PASSWORD) {
+    WIN.creds.usuario  = process.env.WIN_USUARIO;
+    WIN.creds.password = process.env.WIN_PASSWORD;
+    console.log('✓ Credenciales WIN cargadas desde variables de entorno');
   }
 }
 loadCreds();
@@ -176,26 +184,37 @@ async function doLogin(pg) {
   console.log('✓ Login exitoso. URL:', url);
 }
 
+// Detecta si WIN cerró la sesión y re-ingresa automáticamente
+async function checkSesionWIN(pg) {
+  const url = pg.url();
+  const enLogin = url.includes('/login') || url.includes('sign-in');
+  if (enLogin) {
+    console.log('⚠ Sesión WIN expirada. Re-ingresando automáticamente...');
+    loggedIn = false;
+    await doLogin(pg);
+    return true; // sesión estaba expirada, se renovó
+  }
+  return false;
+}
+
 // ─────────────────────────────────────────
 // FLUJO COMPLETO DE VALIDACIÓN
 // ─────────────────────────────────────────
 async function ejecutarValidacion(datos) {
   const pg = await getPage();
 
-  // Login si es necesario
+  // Login inicial o re-login si la sesión expiró
   if (!loggedIn) {
     await doLogin(pg);
   } else {
-    // Verificar que no haya caducado la sesión
-    const url = pg.url();
-    if (url.includes('/login')) {
-      loggedIn = false;
-      await doLogin(pg);
-    }
+    await checkSesionWIN(pg);
   }
 
   // ── PASO 1: Clic en menú "Ventas" ──────────────────────────────
   console.log('📌 Paso 1: Navegando a Ventas...');
+  // Verificar sesión antes de navegar (WIN puede haber cerrado sesión)
+  await checkSesionWIN(pg);
+
   try {
     // Buscar el link de menú que contenga el texto "Ventas"
     await pg.waitForFunction(() => {
@@ -406,11 +425,11 @@ async function limpiarYEscribir(pg, selector, texto) {
 // Estado
 app.get('/estado', (req, res) => {
   res.json({
-    ok: true,
-    servidor: 'L-TEL Validador WIN v2.0',
+    ok:            true,
+    servidor:      'L-TEL Validador WIN v2.0',
     loggedIn,
-    credenciales_ok: !!(WIN.creds.usuario && WIN.creds.password),
-    timestamp: new Date().toISOString(),
+    credsCargadas: !!(WIN.creds.usuario && WIN.creds.password),
+    timestamp:     new Date().toISOString(),
   });
 });
 
@@ -435,7 +454,19 @@ app.post('/validar', async (req, res) => {
     res.json({ ...resultado, dni, tipo });
   } catch(e) {
     console.error('✗ Error:', e.message);
-    if (e.message.includes('Login') || e.message.includes('login')) loggedIn = false;
+    // Si el error fue de sesión expirada, reintentar una vez automáticamente
+    if (e.message.toLowerCase().includes('login') || e.message.toLowerCase().includes('sesi')) {
+      console.log('🔄 Reintentando tras re-login...');
+      loggedIn = false;
+      try {
+        const resultado = await ejecutarValidacion({ dni, tipo, direccion, distrito, hhuu, via, numero });
+        console.log('✓ Reintento exitoso:', resultado.resultado);
+        return res.json({ ...resultado, dni, tipo });
+      } catch(e2) {
+        console.error('✗ Reintento fallido:', e2.message);
+        return res.status(500).json({ ok: false, error: e2.message });
+      }
+    }
     res.status(500).json({ ok: false, error: e.message });
   }
 });

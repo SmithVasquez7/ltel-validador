@@ -242,6 +242,9 @@ tr:hover td{background:rgba(255,255,255,.02)}
     <a class="nav-link" href="usuarios.html">
       <i class="fas fa-users"></i> Usuarios
     </a>
+    <a class="nav-link" href="admin.html" id="link-admin" style="display:none">
+      <i class="fas fa-crown" style="color:#c4b5fd"></i> <span style="color:#c4b5fd">Panel Admin</span>
+    </a>
   </nav>
 
   <div class="sidebar-footer">
@@ -482,6 +485,7 @@ const session=JSON.parse(_sess);
 document.getElementById('user-name').textContent=session.nombre||session.usuario;
 document.getElementById('user-role').textContent=session.rol==='admin'?'Administrador':'Operador';
 document.getElementById('user-avatar').textContent=(session.nombre||session.usuario).charAt(0).toUpperCase();
+if(session.rol==='admin')document.getElementById('link-admin').style.display='flex';
 
 function logout(){sessionStorage.removeItem('validadorUser');window.location.href='login.html';}
 
