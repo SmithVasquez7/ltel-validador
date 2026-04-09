@@ -448,19 +448,32 @@ async function ejecutarValidacion(datos) {
   await pg.click('span[aria-controls="select2-tipo_doc-container"]');
   await sleep(1500); // esperar que se despliegue el dropdown con animación
 
-  // Esperar que el listbox esté visible y seleccionar DNI por texto exacto
-  await pg.waitForFunction(() => {
-    const ul = document.getElementById('select2-tipo_doc-results');
-    return ul && ul.getAttribute('aria-hidden') === 'false';
-  }, { timeout: 10000 });
+  // Esperar que aparezcan las opciones en el DOM
+  await pg.waitForSelector('#select2-tipo_doc-results .select2-results__option', { visible: true, timeout: 10000 });
   await sleep(400);
+  await shot(pg, '13a_dropdown_abierto');
 
-  await pg.evaluate(() => {
-    const opts = document.querySelectorAll('#select2-tipo_doc-results .select2-results__option');
-    const dni  = [...opts].find(o => o.textContent.trim() === 'DNI');
-    if (!dni) throw new Error('Opción DNI no encontrada en lista');
-    dni.click();
-  });
+  // Log de opciones para debug
+  const opcionesDNI = await pg.$$eval(
+    '#select2-tipo_doc-results .select2-results__option',
+    els => els.map(e => e.textContent.trim())
+  );
+  console.log('  📋 Opciones disponibles:', opcionesDNI);
+
+  // Buscar y hacer clic nativo de Puppeteer sobre la opción DNI
+  const optionHandles = await pg.$$('#select2-tipo_doc-results .select2-results__option');
+  let dniClicked = false;
+  for (const handle of optionHandles) {
+    const texto = await handle.evaluate(el => el.textContent.trim());
+    if (texto === 'DNI') {
+      await handle.click();
+      dniClicked = true;
+      console.log('  ✓ DNI seleccionado');
+      break;
+    }
+  }
+  if (!dniClicked) throw new Error('Opción DNI no encontrada en lista. Opciones: ' + opcionesDNI.join(', '));
+
   await sleep(1000);
   await shot(pg, '13_tipo_doc_dni');
 
