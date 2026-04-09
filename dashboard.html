@@ -238,6 +238,23 @@ tr:hover td{background:rgba(255,255,255,.02)}
   </div>
 </div>
 
+<!-- MODAL DETALLE VALIDACIÓN -->
+<div id="modal-detalle" style="display:none;position:fixed;inset:0;z-index:200;background:rgba(0,0,0,.75);backdrop-filter:blur(8px);align-items:center;justify-content:center;padding:1rem" onclick="if(event.target===this)this.style.display='none'">
+  <div style="background:#0f1e35;border:1px solid rgba(255,255,255,.1);border-radius:16px;padding:2rem;width:100%;max-width:520px;box-shadow:0 30px 60px rgba(0,0,0,.6);max-height:90vh;overflow-y:auto">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.5rem">
+      <div>
+        <div style="font-size:1rem;font-weight:700;color:#fff" id="modal-det-titulo"><i class="fas fa-file-alt" style="color:var(--primary-light);margin-right:.5rem"></i>Detalle de Validación</div>
+        <div style="font-size:.75rem;color:var(--text-secondary);margin-top:.2rem" id="modal-det-fecha"></div>
+      </div>
+      <button onclick="document.getElementById('modal-detalle').style.display='none'" style="background:rgba(255,255,255,.06);border:1px solid var(--border);border-radius:8px;color:var(--text-secondary);width:32px;height:32px;cursor:pointer;font-size:.9rem">✕</button>
+    </div>
+    <!-- Badge resultado -->
+    <div id="modal-det-badge" style="margin-bottom:1.25rem"></div>
+    <!-- Grid de datos -->
+    <div id="modal-det-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem"></div>
+  </div>
+</div>
+
 <!-- Sidebar overlay (mobile) -->
 <div class="sidebar-overlay" id="overlay" onclick="closeSidebar()"></div>
 
@@ -729,7 +746,7 @@ document.getElementById('validForm').addEventListener('submit',async(e)=>{
       showResult(uiType, uiTitle, uiSub,
         [
           {label:'DNI',val:dni},
-          {label:'Dirección',val:direccionFinal},
+          {label:'Dirección',val:direccionResumen},
           {label:'Cobertura WIN',val:data.tieneCobertura?'✅ Tiene cobertura':'❌ Sin cobertura'},
           {label:'Score cliente',val:scoreLabel},
           {label:'Detalle',val:data.detalle||'—'},
@@ -756,7 +773,8 @@ document.getElementById('validForm').addEventListener('submit',async(e)=>{
   document.getElementById('progreso-wrap').style.display = 'none';
   document.getElementById('banner-progreso').style.display = 'none';
   btn.disabled=false; btn.classList.remove('loading');
-  loadHistorial(); loadStats();
+  // Esperar que Firestore propague el update antes de recargar tabla
+  setTimeout(()=>{ loadHistorial(); loadStats(); }, 1200);
 });
 
 // ── Guardar credenciales WIN ──
@@ -822,6 +840,8 @@ async function loadHistorial(){
         'con_cobertura':'<span class="badge badge-success"><i class="fas fa-wifi"></i> Con cobertura</span>',
       };
       const tr=document.createElement('tr');
+      tr.style.cursor='pointer';
+      tr.title='Clic para ver detalles';
       tr.innerHTML=`
         <td style="font-weight:600;color:#fff">${escHtml(d.dni||'')}</td>
         <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escHtml(d.direccion||'')}">${escHtml(d.direccion||'')}</td>
@@ -829,6 +849,7 @@ async function loadHistorial(){
         <td>${badgeMap[d.resultado]||badgeMap['pendiente']}</td>
         <td>${escHtml(d.operadorNombre||d.operador||'')}</td>
         <td>${fechaStr}</td>`;
+      tr.addEventListener('click', ()=> abrirDetalle(doc.id, d));
       tbody.appendChild(tr);
     });
   }catch(e){}
@@ -853,6 +874,62 @@ async function loadStats(){
 }
 
 function escHtml(s){return String(s).replace(/[<>&"']/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;',"'":'&#39;'}[c]));}
+
+// ── Modal detalle de validación ──
+function abrirDetalle(id, d) {
+  const modal = document.getElementById('modal-detalle');
+  const badgeMap = {
+    'pendiente':    '<span class="badge badge-pending" style="font-size:.82rem;padding:.3rem .9rem"><i class="fas fa-clock"></i> Pendiente</span>',
+    'aprobado':     '<span class="badge badge-success" style="font-size:.82rem;padding:.3rem .9rem"><i class="fas fa-check-circle"></i> Aprobado</span>',
+    'rechazado':    '<span class="badge badge-error"   style="font-size:.82rem;padding:.3rem .9rem"><i class="fas fa-user-times"></i> Score bajo</span>',
+    'sin_cobertura':'<span class="badge badge-error"   style="font-size:.82rem;padding:.3rem .9rem"><i class="fas fa-times-circle"></i> Sin cobertura</span>',
+  };
+  // Título con DNI
+  document.getElementById('modal-det-titulo').innerHTML =
+    `<i class="fas fa-id-card" style="color:var(--primary-light);margin-right:.5rem"></i>DNI: ${escHtml(d.dni||'—')}`;
+  // Fecha
+  const fechaLegible = d.fechaISO
+    ? new Date(d.fechaISO).toLocaleString('es-PE',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'})
+    : '—';
+  document.getElementById('modal-det-fecha').textContent = fechaLegible;
+  // Badge
+  document.getElementById('modal-det-badge').innerHTML = badgeMap[d.resultado] || badgeMap['pendiente'];
+
+  // Armar campos
+  const campos = [
+    {label:'DNI',         val: d.dni||'—'},
+    {label:'Dirección',   val: d.direccion||'—', full: true},
+    {label:'Tipo',        val: d.tipo==='coords'?'Coordenadas GPS':'Calle / Av.'},
+    {label:'Operador',    val: d.operadorNombre||d.operador||'—'},
+    {label:'Cobertura WIN', val: d.resultado==='sin_cobertura'?'❌ Sin cobertura':'✅ Tiene cobertura'},
+    {label:'Score cliente', val: d.scoreNum!=null ? String(d.scoreNum) : '—'},
+    {label:'Calificación',  val: d.aprobado===true ? '✅ Aprobado (≥301)' : d.aprobado===false ? '❌ Rechazado (<301)' : '—'},
+    {label:'Detalle score', val: d.detalleResultado||'—', full: true},
+  ];
+  // Campos extras según tipo
+  if(d.tipo==='calle'){
+    if(d.distrito) campos.push({label:'Distrito/Prov/Dpto', val:d.distrito, full:true});
+    if(d.hhuu)     campos.push({label:'Urbanización', val:d.hhuu});
+    if(d.via)      campos.push({label:'Calle/Av.', val:d.via});
+    if(d.numero)   campos.push({label:'Número', val:d.numero});
+  } else {
+    if(d.latitud)  campos.push({label:'Latitud', val:d.latitud});
+    if(d.longitud) campos.push({label:'Longitud', val:d.longitud});
+  }
+  if(d.observaciones) campos.push({label:'Observaciones', val:d.observaciones, full:true});
+  campos.push({label:'ID Registro', val:id.slice(0,12).toUpperCase(), full:true});
+
+  const grid = document.getElementById('modal-det-grid');
+  grid.innerHTML = '';
+  campos.forEach(c => {
+    const div = document.createElement('div');
+    div.style.cssText = `background:rgba(255,255,255,.04);border-radius:8px;padding:.75rem 1rem;${c.full?'grid-column:1/-1':''}`;
+    div.innerHTML = `<div style="font-size:.67rem;text-transform:uppercase;letter-spacing:.08em;color:var(--text-muted);margin-bottom:.3rem">${escHtml(c.label)}</div><div style="font-size:.88rem;font-weight:600;color:#fff;word-break:break-word">${escHtml(c.val)}</div>`;
+    grid.appendChild(div);
+  });
+
+  modal.style.display = 'flex';
+}
 
 // ── Validar solo números en DNI ──
 document.getElementById('dni').addEventListener('input',function(){

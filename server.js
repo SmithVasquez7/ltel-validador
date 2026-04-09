@@ -352,21 +352,21 @@ async function ejecutarValidacion(datos) {
     await pg.waitForSelector(WIN.sel.input_distrito, { timeout: 10000 });
     await sleep(500);
     await limpiarYEscribir(pg, WIN.sel.input_distrito, datos.distrito || '');
-    await sleep(1000); // esperar autocomplete de distrito
+    await sleep(5000); // esperar que el mapa cargue el distrito con calma
 
     // Urbanización (opcional)
     if (datos.hhuu) {
       await limpiarYEscribir(pg, WIN.sel.input_hhuu, datos.hhuu);
-      await sleep(800);
+      await sleep(4000); // esperar que filtre la urbanización
     }
 
     // Nombre de calle
     await limpiarYEscribir(pg, WIN.sel.input_via, datos.via || '');
-    await sleep(800);
+    await sleep(4000); // esperar que cargue el nombre de vía
 
     // Número
     await limpiarYEscribir(pg, WIN.sel.input_numero, datos.numero || '');
-    await sleep(600);
+    await sleep(3000); // esperar que se complete la dirección exacta
     await shot(pg, '06_calle_filled');
   }
 
