@@ -291,13 +291,16 @@ async function ejecutarValidacion(datos) {
       return [...items].some(el => el.querySelector('.menu-title')?.textContent.trim() === 'Ventas');
     }, { timeout: 15000 });
 
-    await pg.evaluate(() => {
+    // Clic nativo de Puppeteer sobre el .menu-link de Ventas
+    const ventasHandle = await pg.evaluateHandle(() => {
       const items = document.querySelectorAll('[data-kt-menu-trigger="click"]');
       const ventas = [...items].find(el => el.querySelector('.menu-title')?.textContent.trim() === 'Ventas');
-      if (ventas) ventas.querySelector('.menu-link').click();
+      return ventas?.querySelector('.menu-link') || null;
     });
+    if (!ventasHandle || !(await ventasHandle.asElement())) throw new Error('No se encontró .menu-link del menú Ventas');
+    await ventasHandle.click();
 
-    await sleep(2000); // esperar que el submenú se despliegue
+    await sleep(2500); // esperar que el submenú se despliegue con animación
     await shot(pg, '04_menu_ventas');
   } catch(e) {
     throw new Error('No se encontró el menú Ventas: ' + e.message);
@@ -306,8 +309,9 @@ async function ejecutarValidacion(datos) {
   // ── PASO 2: Clic en submenú "Nuevo Lead" (navega a la página) ──
   setProgreso(3, 'Abriendo página Nuevo Lead...', '📝');
   console.log('📌 Paso 2: Clic en submenú Nuevo Lead...');
-  await pg.waitForSelector(WIN.sel.btn_nuevo_lead, { timeout: 10000 });
-  await sleep(500); // pequeña pausa antes de hacer clic
+  // visible:true asegura que el elemento esté visible (no solo en el DOM oculto)
+  await pg.waitForSelector(WIN.sel.btn_nuevo_lead, { visible: true, timeout: 10000 });
+  await sleep(500);
   await pg.click(WIN.sel.btn_nuevo_lead);
   await sleep(3000); // esperar que la página de leads cargue completamente
   await shot(pg, '05_pagina_nuevo_lead');
