@@ -110,6 +110,8 @@ function resetProgreso() {
 const SHOTS_DIR = path.join(__dirname, 'screenshots');
 if (!fs.existsSync(SHOTS_DIR)) fs.mkdirSync(SHOTS_DIR);
 
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
 async function shot(page, name) {
   try {
     await page.screenshot({ path: path.join(SHOTS_DIR, `${name}_${Date.now()}.png`) });
@@ -198,12 +200,13 @@ async function doLogin(pg) {
   await pg.type('#identifierId', WIN.creds.usuario, { delay: 60 });
   await shot(pg, '03_google_email');
   await pg.click('#identifierNext');
-  console.log('  → Email enviado...');
+  console.log('  → Email enviado, esperando pantalla de contraseña...');
+  await sleep(2000); // esperar transición de pantalla
 
   // ── Paso 4: Google OAuth — ingresar contraseña ──
   setProgreso(1, 'Ingresando contraseña en Google...', '🔒');
-  await pg.waitForSelector('input[name="Passwd"]', { visible: true, timeout: 15000 });
-  await pg.waitForTimeout(500);
+  await pg.waitForSelector('input[name="Passwd"]', { visible: true, timeout: 20000 });
+  await sleep(800);
   await pg.click('input[name="Passwd"]', { clickCount: 3 });
   await pg.type('input[name="Passwd"]', WIN.creds.password, { delay: 60 });
   await shot(pg, '04_google_password');
@@ -296,7 +299,7 @@ async function ejecutarValidacion(datos) {
       if (ventas) ventas.querySelector('.menu-link').click();
     });
 
-    await pg.waitForTimeout(800);
+    await sleep(800);
     await shot(pg, '04_menu_ventas');
   } catch(e) {
     throw new Error('No se encontró el menú Ventas: ' + e.message);
@@ -307,7 +310,7 @@ async function ejecutarValidacion(datos) {
   console.log('📌 Paso 2: Clic en Nuevo Lead...');
   await pg.waitForSelector(WIN.sel.btn_nuevo_lead, { timeout: 10000 });
   await pg.click(WIN.sel.btn_nuevo_lead);
-  await pg.waitForTimeout(1200); // esperar que abra el modal
+  await sleep(1200); // esperar que abra el modal
   await shot(pg, '05_modal_nuevo_lead');
 
   // ── PASO 3: Llenar formulario según tipo ───────────────────────
@@ -328,17 +331,17 @@ async function ejecutarValidacion(datos) {
     // Distrito
     await pg.waitForSelector(WIN.sel.input_distrito, { timeout: 10000 });
     await limpiarYEscribir(pg, WIN.sel.input_distrito, datos.distrito || '');
-    await pg.waitForTimeout(600); // esperar autocomplete
+    await sleep(600); // esperar autocomplete
 
     // Urbanización (opcional)
     if (datos.hhuu) {
       await limpiarYEscribir(pg, WIN.sel.input_hhuu, datos.hhuu);
-      await pg.waitForTimeout(400);
+      await sleep(400);
     }
 
     // Nombre de calle
     await limpiarYEscribir(pg, WIN.sel.input_via, datos.via || '');
-    await pg.waitForTimeout(400);
+    await sleep(400);
 
     // Número
     await limpiarYEscribir(pg, WIN.sel.input_numero, datos.numero || '');
@@ -381,7 +384,7 @@ async function ejecutarValidacion(datos) {
     await pg.waitForSelector(WIN.sel.btn_continuar, { timeout: 25000 });
     await shot(pg, '10_continuar_visible');
     await pg.click(WIN.sel.btn_continuar);
-    await pg.waitForTimeout(1200);
+    await sleep(1200);
     await shot(pg, '11_info_cliente_tab');
 
     // ── PASO 7: Leer resultado de cobertura ───────────────────────
@@ -419,7 +422,7 @@ async function ejecutarValidacion(datos) {
         if (dni) dni.click();
         else throw new Error('Opción DNI no encontrada en dropdown');
       });
-      await pg.waitForTimeout(500);
+      await sleep(500);
       await shot(pg, '13_tipo_doc_dni');
     } catch(e) {
       throw new Error('No se pudo seleccionar DNI en tipo de documento: ' + e.message);
