@@ -166,11 +166,29 @@ async function doLogin(pg) {
   await pg.goto(WIN.url_login, { waitUntil: 'domcontentloaded', timeout: 30000 });
   await shot(pg, '01_login_page');
 
-  // ── Paso A: Clic en "Iniciar con Google" ──
-  console.log('  → Buscando botón Google...');
+  // ── Paso A: Clic en "Iniciar con Google" (página appwinforce) ──
+  console.log('  → Buscando botón Google en appwinforce...');
   await pg.waitForSelector('.login-button.google', { timeout: 15000 });
   await pg.click('.login-button.google');
   await shot(pg, '01b_google_btn');
+
+  // ── Paso A2: Esperar accesoventas.win.pe y clic "Iniciar con Google" ──
+  setProgreso(1, 'Seleccionando cuenta Google...', '🔐');
+  console.log('  → Esperando página accesoventas.win.pe...');
+  try {
+    await pg.waitForFunction(
+      () => window.location.href.includes('accesoventas'),
+      { timeout: 15000 }
+    );
+    await shot(pg, '01c_accesoventas');
+    // Buscar el botón "Iniciar con Google" en esta página intermedia
+    await pg.waitForSelector('.login-button.google, button[onclick*="google"], a[href*="google"]', { timeout: 10000 });
+    await pg.click('.login-button.google, button[onclick*="google"], a[href*="google"]');
+    console.log('  → Clic en Google en accesoventas');
+    await shot(pg, '01d_google_btn2');
+  } catch(_) {
+    console.log('  → No apareció accesoventas, continuando con OAuth directo...');
+  }
 
   // ── Paso B: Google — ingresar email ──
   setProgreso(1, 'Ingresando correo en Google...', '📧');
