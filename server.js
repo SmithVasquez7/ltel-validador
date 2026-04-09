@@ -36,11 +36,6 @@ const WIN = {
   creds: { usuario: '', password: '' },
 
   sel: {
-    // ── Login ──
-    input_usuario:  '#username',
-    input_password: '#password',
-    btn_login:      '#ingresar',
-
     // ── Menú Ventas ── (trigger del menú desplegable, no el subitem)
     menu_ventas: '[data-kt-menu-trigger="click"]',  // se filtra por texto "Ventas"
 
@@ -163,46 +158,83 @@ async function getPage() {
 }
 
 // ─────────────────────────────────────────
-// LOGIN EN WIN
+// LOGIN EN WIN (flujo: WIN → Iniciar con Google → Google OAuth → WIN)
 // ─────────────────────────────────────────
 async function doLogin(pg) {
   setProgreso(1, 'Iniciando sesión en WIN...', '🔑');
-  console.log('🔑 Haciendo login en WIN...');
+  console.log('🔑 Abriendo página de login WIN...');
   await pg.goto(WIN.url_login, { waitUntil: 'domcontentloaded', timeout: 30000 });
   await shot(pg, '01_login_page');
 
-  // Esperar campo usuario
-  await pg.waitForSelector(WIN.sel.input_usuario, { timeout: 15000 });
+  // ── Paso A: Clic en "Iniciar con Google" ──
+  console.log('  → Buscando botón Google...');
+  await pg.waitForSelector('.login-button.google', { timeout: 15000 });
+  await pg.click('.login-button.google');
+  await shot(pg, '01b_google_btn');
 
-  // Llenar usuario
-  await pg.click(WIN.sel.input_usuario, { clickCount: 3 });
-  await pg.type(WIN.sel.input_usuario, WIN.creds.usuario, { delay: 55 });
+  // ── Paso B: Google — ingresar email ──
+  setProgreso(1, 'Ingresando correo en Google...', '📧');
+  console.log('  → Esperando campo email de Google...');
+  await pg.waitForSelector('#identifierId', { timeout: 20000 });
+  await pg.click('#identifierId', { clickCount: 3 });
+  await pg.type('#identifierId', WIN.creds.usuario, { delay: 60 });
+  await shot(pg, '02_google_email');
 
-  // Llenar password
-  await pg.click(WIN.sel.input_password, { clickCount: 3 });
-  await pg.type(WIN.sel.input_password, WIN.creds.password, { delay: 55 });
+  // Clic en "Siguiente" (email)
+  await pg.click('#identifierNext');
+  console.log('  → Email enviado, esperando campo contraseña...');
 
-  await shot(pg, '02_login_filled');
-  await pg.click(WIN.sel.btn_login);
+  // ── Paso C: Google — ingresar contraseña ──
+  setProgreso(1, 'Ingresando contraseña en Google...', '🔒');
+  await pg.waitForSelector('input[name="Passwd"]', { visible: true, timeout: 15000 });
+  await pg.waitForTimeout(500);
+  await pg.click('input[name="Passwd"]', { clickCount: 3 });
+  await pg.type('input[name="Passwd"]', WIN.creds.password, { delay: 60 });
+  await shot(pg, '03_google_password');
 
-  // Esperar que desaparezca la página de login (max 30s)
+  // Clic en "Siguiente" (contraseña)
+  await pg.click('#passwordNext');
+  console.log('  → Contraseña enviada...');
+
+  // ── Paso D: Posible pantalla "Continuar" (consent/picker) ──
   try {
-    await pg.waitForFunction(() => !window.location.href.includes('/login'), { timeout: 30000 });
+    await pg.waitForFunction(() => {
+      const spans = document.querySelectorAll('[jsname="V67aGc"]');
+      return [...spans].some(s => s.textContent.trim() === 'Continuar');
+    }, { timeout: 10000 });
+
+    await pg.evaluate(() => {
+      const spans = document.querySelectorAll('[jsname="V67aGc"]');
+      const btn = [...spans].find(s => s.textContent.trim() === 'Continuar');
+      if (btn) (btn.closest('button') || btn).click();
+    });
+    console.log('  → Clic en Continuar');
+    await shot(pg, '04_continuar');
   } catch(_) {
-    await shot(pg, '03_login_failed');
-    const url2 = pg.url();
-    throw new Error(`Login fallido — sigue en login. URL: ${url2}`);
+    console.log('  → No apareció pantalla Continuar, continuando...');
   }
 
-  // Esperar que el menú principal cargue completamente
+  // ── Paso E: Esperar que WIN cargue ──
+  setProgreso(1, 'Esperando que WIN cargue...', '⏳');
   try {
-    await pg.waitForSelector('[data-kt-menu-trigger="click"]', { timeout: 15000 });
+    await pg.waitForFunction(
+      () => !window.location.href.includes('accounts.google.com') && !window.location.href.includes('/login'),
+      { timeout: 30000 }
+    );
   } catch(_) {
-    await shot(pg, '03_menu_no_cargo');
-    throw new Error('Login OK pero el menú no cargó. URL: ' + pg.url());
+    await shot(pg, '05_win_no_cargo');
+    throw new Error('Login Google completado pero WIN no redirigió. URL: ' + pg.url());
   }
 
-  await shot(pg, '03_post_login');
+  // Esperar que el menú WIN cargue
+  try {
+    await pg.waitForSelector('[data-kt-menu-trigger="click"]', { timeout: 20000 });
+  } catch(_) {
+    await shot(pg, '05_menu_no_cargo');
+    throw new Error('WIN cargó pero el menú no apareció. URL: ' + pg.url());
+  }
+
+  await shot(pg, '05_post_login');
   loggedIn = true;
   console.log('✓ Login exitoso. URL:', pg.url());
 }
@@ -210,12 +242,12 @@ async function doLogin(pg) {
 // Detecta si WIN cerró la sesión y re-ingresa automáticamente
 async function checkSesionWIN(pg) {
   const url = pg.url();
-  const enLogin = url.includes('/login') || url.includes('sign-in');
+  const enLogin = url.includes('/login') || url.includes('accounts.google.com');
   if (enLogin) {
     console.log('⚠ Sesión WIN expirada. Re-ingresando automáticamente...');
     loggedIn = false;
     await doLogin(pg);
-    return true; // sesión estaba expirada, se renovó
+    return true;
   }
   return false;
 }
