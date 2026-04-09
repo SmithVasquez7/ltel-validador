@@ -680,21 +680,6 @@ document.getElementById('validForm').addEventListener('submit',async(e)=>{
     }catch(_){}
   }, 1000);
 
-  // Guardar en Firestore con estado "pendiente"
-  let docId='';
-  try{
-    const docRef=await db.collection('validaciones').add({
-      dni, direccion:direccionResumen, tipo:tipoActual,
-      distrito, hhuu, via, numero, latitud, longitud,
-      observaciones:obs,
-      operador:session.usuario, operadorNombre:session.nombre||session.usuario,
-      resultado:'pendiente', detalleResultado:'',
-      fecha:firebase.firestore.FieldValue.serverTimestamp(),
-      fechaISO:new Date().toISOString(),
-    });
-    docId=docRef.id;
-  }catch(err){ console.warn('Firebase error:',err); }
-
   // Llamar al servidor Node
   try{
     const resp=await fetch(`${SERVER}/validar`,{
@@ -717,13 +702,24 @@ document.getElementById('validForm').addEventListener('submit',async(e)=>{
       const esSinCob    = tipo_r==='sin_cobertura';
       const esRechazado = tipo_r==='rechazado';
 
-      // Actualizar en Firestore
-      if(docId) await db.collection('validaciones').doc(docId).update({
-        resultado:tipo_r,
-        detalleResultado:data.detalle||'',
-        scoreNum:data.scoreNum||null,
-        aprobado:data.aprobado||false,
-      }).catch(()=>{});
+      // Guardar en Firestore con TODO el resultado completo de una sola vez
+      let docId='';
+      try{
+        const docRef=await db.collection('validaciones').add({
+          dni, direccion:direccionResumen, tipo:tipoActual,
+          distrito, hhuu, via, numero, latitud, longitud,
+          observaciones:obs,
+          operador:session.usuario, operadorNombre:session.nombre||session.usuario,
+          resultado:    tipo_r,
+          detalleResultado: data.detalle||'',
+          scoreNum:     data.scoreNum ?? null,
+          aprobado:     data.aprobado ?? false,
+          tieneCobertura: data.tieneCobertura ?? false,
+          fecha:firebase.firestore.FieldValue.serverTimestamp(),
+          fechaISO:new Date().toISOString(),
+        });
+        docId=docRef.id;
+      }catch(err){ console.warn('Firebase error al guardar:', err); }
 
       // ── Determinar estilo del resultado ──
       let uiType, uiTitle, uiSub;
@@ -773,8 +769,7 @@ document.getElementById('validForm').addEventListener('submit',async(e)=>{
   document.getElementById('progreso-wrap').style.display = 'none';
   document.getElementById('banner-progreso').style.display = 'none';
   btn.disabled=false; btn.classList.remove('loading');
-  // Esperar que Firestore propague el update antes de recargar tabla
-  setTimeout(()=>{ loadHistorial(); loadStats(); }, 1200);
+  loadHistorial(); loadStats();
 });
 
 // ── Guardar credenciales WIN ──
