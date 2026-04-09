@@ -166,73 +166,68 @@ async function doLogin(pg) {
   await pg.goto(WIN.url_login, { waitUntil: 'domcontentloaded', timeout: 30000 });
   await shot(pg, '01_login_page');
 
-  // ── Paso A: Clic en "Iniciar con Google" (página appwinforce) ──
-  console.log('  → Buscando botón Google en appwinforce...');
-  await pg.waitForSelector('.login-button.google', { timeout: 15000 });
-  await pg.click('.login-button.google');
-  await shot(pg, '01b_google_btn');
+  // ── Paso 1: Ingresar usuario y contraseña ──
+  console.log('  → Ingresando credenciales WIN...');
+  await pg.waitForSelector('#username', { timeout: 15000 });
+  await pg.click('#username', { clickCount: 3 });
+  await pg.type('#username', WIN.creds.usuario, { delay: 60 });
+  await pg.click('#password', { clickCount: 3 });
+  await pg.type('#password', WIN.creds.password, { delay: 60 });
+  await shot(pg, '01b_creds_filled');
+  await pg.click('#ingresar');
+  console.log('  → Credenciales enviadas, esperando siguiente pantalla...');
 
-  // ── Paso A2: Esperar accesoventas.win.pe y clic "Iniciar con Google" ──
-  setProgreso(1, 'Seleccionando cuenta Google...', '🔐');
-  console.log('  → Esperando página accesoventas.win.pe...');
+  // ── Paso 2: Esperar pantalla de selección y clic "Iniciar con Google" ──
+  setProgreso(1, 'Seleccionando acceso con Google...', '🔐');
   try {
-    await pg.waitForFunction(
-      () => window.location.href.includes('accesoventas'),
-      { timeout: 15000 }
-    );
-    await shot(pg, '01c_accesoventas');
-    // Buscar el botón "Iniciar con Google" en esta página intermedia
-    await pg.waitForSelector('.login-button.google, button[onclick*="google"], a[href*="google"]', { timeout: 10000 });
-    await pg.click('.login-button.google, button[onclick*="google"], a[href*="google"]');
-    console.log('  → Clic en Google en accesoventas');
-    await shot(pg, '01d_google_btn2');
-  } catch(_) {
-    console.log('  → No apareció accesoventas, continuando con OAuth directo...');
+    await pg.waitForSelector('.login-button.google', { timeout: 20000 });
+    await shot(pg, '02_selector_pantalla');
+    console.log('  → Clic en "Iniciar con Google"...');
+    await pg.click('.login-button.google');
+    await shot(pg, '02b_google_clicked');
+  } catch(e) {
+    await shot(pg, '02_error');
+    throw new Error('No apareció el botón "Iniciar con Google": ' + e.message);
   }
 
-  // ── Paso B: Google — ingresar email ──
+  // ── Paso 3: Google OAuth — ingresar email ──
   setProgreso(1, 'Ingresando correo en Google...', '📧');
   console.log('  → Esperando campo email de Google...');
   await pg.waitForSelector('#identifierId', { timeout: 20000 });
   await pg.click('#identifierId', { clickCount: 3 });
   await pg.type('#identifierId', WIN.creds.usuario, { delay: 60 });
-  await shot(pg, '02_google_email');
-
-  // Clic en "Siguiente" (email)
+  await shot(pg, '03_google_email');
   await pg.click('#identifierNext');
-  console.log('  → Email enviado, esperando campo contraseña...');
+  console.log('  → Email enviado...');
 
-  // ── Paso C: Google — ingresar contraseña ──
+  // ── Paso 4: Google OAuth — ingresar contraseña ──
   setProgreso(1, 'Ingresando contraseña en Google...', '🔒');
   await pg.waitForSelector('input[name="Passwd"]', { visible: true, timeout: 15000 });
   await pg.waitForTimeout(500);
   await pg.click('input[name="Passwd"]', { clickCount: 3 });
   await pg.type('input[name="Passwd"]', WIN.creds.password, { delay: 60 });
-  await shot(pg, '03_google_password');
-
-  // Clic en "Siguiente" (contraseña)
+  await shot(pg, '04_google_password');
   await pg.click('#passwordNext');
   console.log('  → Contraseña enviada...');
 
-  // ── Paso D: Posible pantalla "Continuar" (consent/picker) ──
+  // ── Paso 5: Posible pantalla "Continuar" ──
   try {
     await pg.waitForFunction(() => {
       const spans = document.querySelectorAll('[jsname="V67aGc"]');
       return [...spans].some(s => s.textContent.trim() === 'Continuar');
     }, { timeout: 10000 });
-
     await pg.evaluate(() => {
       const spans = document.querySelectorAll('[jsname="V67aGc"]');
       const btn = [...spans].find(s => s.textContent.trim() === 'Continuar');
       if (btn) (btn.closest('button') || btn).click();
     });
     console.log('  → Clic en Continuar');
-    await shot(pg, '04_continuar');
+    await shot(pg, '05_continuar');
   } catch(_) {
-    console.log('  → No apareció pantalla Continuar, continuando...');
+    console.log('  → Sin pantalla Continuar, siguiendo...');
   }
 
-  // ── Paso E: Esperar que WIN cargue ──
+  // ── Paso 6: Esperar que WIN cargue con menú ──
   setProgreso(1, 'Esperando que WIN cargue...', '⏳');
   try {
     await pg.waitForFunction(
@@ -240,19 +235,17 @@ async function doLogin(pg) {
       { timeout: 30000 }
     );
   } catch(_) {
-    await shot(pg, '05_win_no_cargo');
-    throw new Error('Login Google completado pero WIN no redirigió. URL: ' + pg.url());
+    await shot(pg, '06_win_no_cargo');
+    throw new Error('Google OK pero WIN no redirigió. URL: ' + pg.url());
   }
-
-  // Esperar que el menú WIN cargue
   try {
     await pg.waitForSelector('[data-kt-menu-trigger="click"]', { timeout: 20000 });
   } catch(_) {
-    await shot(pg, '05_menu_no_cargo');
+    await shot(pg, '06_menu_no_cargo');
     throw new Error('WIN cargó pero el menú no apareció. URL: ' + pg.url());
   }
 
-  await shot(pg, '05_post_login');
+  await shot(pg, '06_post_login');
   loggedIn = true;
   console.log('✓ Login exitoso. URL:', pg.url());
 }
