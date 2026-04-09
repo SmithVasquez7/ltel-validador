@@ -140,11 +140,11 @@ async function getPage() {
         headless:        chromium.headless,
       };
     } else {
-      // Local: usa Chrome instalado con puppeteer, ventana visible
+      // Local: headless para que no tape el dashboard del trabajador
       launchOptions = {
-        headless:        false,
-        defaultViewport: null,
-        args:            ['--start-maximized', '--no-sandbox'],
+        headless:        true,
+        defaultViewport: { width: 1280, height: 900 },
+        args:            ['--no-sandbox', '--disable-setuid-sandbox'],
       };
     }
 
@@ -494,31 +494,45 @@ async function ejecutarValidacion(datos) {
   await sleep(1500);
   await shot(pg, '15_score_buscando');
 
-  // ── PASO 12: Esperar resultado del score ──────────────────────
+  // ── PASO 12: Cerrar SweetAlert si aparece y leer score ────────
   setProgreso(12, 'Esperando resultado del score...', '⏳');
   console.log('⏳ Esperando resultado del score...');
+
+  // Cerrar el SweetAlert ("Bien... Adelante") si aparece
+  try {
+    await pg.waitForSelector('.swal2-confirm', { visible: true, timeout: 8000 });
+    await sleep(500);
+    await pg.click('.swal2-confirm');
+    console.log('  ✓ SweetAlert cerrado');
+    await sleep(800);
+  } catch(_) {
+    console.log('  → Sin SweetAlert, continuando...');
+  }
+
+  // Esperar que #estamos_verificando tenga el score (ej: "Score: 401 - 500")
   try {
     await pg.waitForFunction(() => {
-      const el = document.getElementById('espere_por_favor');
-      return el && el.textContent.trim() !== '' && !el.textContent.includes('Espere');
-    }, { timeout: 30000 });
+      const el = document.getElementById('estamos_verificando');
+      return el && el.textContent.trim() !== '' && el.textContent.includes('Score');
+    }, { timeout: 20000 });
     await sleep(500);
   } catch(_) {
     await shot(pg, '16_score_timeout');
     throw new Error('Tiempo de espera agotado al obtener el score del cliente');
   }
 
-  const scoreTitulo  = await pg.$eval(WIN.sel.score_titulo,  el => el.textContent.trim()).catch(() => '');
-  const scoreDetalle = await pg.$eval(WIN.sel.score_detalle, el => el.textContent.trim()).catch(() => '');
+  const scoreDetalle = await pg.$eval('#estamos_verificando', el => el.textContent.trim()).catch(() => '');
+  const scoreTitulo  = await pg.$eval('#espere_por_favor',    el => el.textContent.trim()).catch(() => '');
   await shot(pg, '16_score_resultado');
+  console.log(`  📊 Score texto: "${scoreDetalle}" | Título: "${scoreTitulo}"`);
 
-  const textoScore = scoreTitulo + ' ' + scoreDetalle;
-  const scoreMatch = textoScore.match(/\d+/);
-  const scoreNum   = scoreMatch ? parseInt(scoreMatch[0]) : null;
-  const aprobado   = scoreNum !== null && scoreNum >= 301;
+  // Extraer el número MENOR del rango (ej: "Score: 201 - 500" → 201)
+  // Se usa el mínimo: si algún extremo del rango está bajo 301, no califica
+  const numeros = scoreDetalle.match(/\d+/g);
+  const scoreNum = numeros ? Math.min(...numeros.map(Number)) : null;
+  const aprobado = scoreNum !== null && scoreNum >= 301;
 
   console.log(`  📊 Score: ${scoreNum} | Aprobado (≥301): ${aprobado}`);
-  console.log(`  📝 "${scoreTitulo}" — "${scoreDetalle}"`);
 
   // ── Volver atrás para dejar la plataforma lista para la siguiente consulta ──
   console.log('  ← Volviendo atrás para nueva consulta...');
@@ -528,7 +542,7 @@ async function ejecutarValidacion(datos) {
   return {
     ok:             true,
     resultado:      aprobado ? 'aprobado' : 'rechazado',
-    detalle:        `${scoreTitulo} — ${scoreDetalle}`,
+    detalle:        scoreDetalle || scoreTitulo || 'Score obtenido',
     scoreTitulo,
     scoreDetalle,
     scoreNum,
