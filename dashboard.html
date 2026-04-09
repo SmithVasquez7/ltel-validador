@@ -325,15 +325,29 @@ tr:hover td{background:rgba(255,255,255,.02)}
           <div class="result-sub" id="result-sub"></div>
         </div>
       </div>
-      <!-- Barra de progreso (visible solo durante procesamiento) -->
-      <div id="progreso-wrap" style="display:none;margin-top:1rem">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.5rem">
-          <span id="progreso-paso" style="font-size:.8rem;color:var(--primary-light);font-weight:500">Iniciando...</span>
-          <span id="progreso-num" style="font-size:.75rem;color:var(--text-muted)">0 / 11</span>
+      <!-- Progreso de automatización (visible solo durante procesamiento) -->
+      <div id="progreso-wrap" style="display:none;margin-top:1.25rem">
+
+        <!-- Paso actual destacado -->
+        <div style="display:flex;align-items:center;gap:.75rem;background:rgba(99,102,241,.12);border:1px solid rgba(99,102,241,.25);border-radius:10px;padding:.85rem 1rem;margin-bottom:.85rem">
+          <span id="progreso-icono" style="font-size:1.4rem;line-height:1">⚙️</span>
+          <div style="flex:1;min-width:0">
+            <div id="progreso-paso" style="font-size:.92rem;font-weight:600;color:#e0e7ff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Iniciando...</div>
+            <div style="font-size:.72rem;color:var(--text-muted);margin-top:.15rem">Automatización WIN en curso — no cierres esta ventana</div>
+          </div>
+          <span id="progreso-num" style="font-size:.78rem;font-weight:700;color:var(--primary-light);white-space:nowrap;background:rgba(99,102,241,.2);padding:.25rem .6rem;border-radius:20px">0 / 12</span>
         </div>
-        <div style="background:rgba(255,255,255,.07);border-radius:50px;height:6px;overflow:hidden">
-          <div id="progreso-bar" style="height:100%;background:linear-gradient(90deg,var(--primary),var(--accent));border-radius:50px;width:0%;transition:width .5s ease"></div>
+
+        <!-- Barra de progreso -->
+        <div style="background:rgba(255,255,255,.07);border-radius:50px;height:8px;overflow:hidden">
+          <div id="progreso-bar" style="height:100%;background:linear-gradient(90deg,var(--primary),var(--accent));border-radius:50px;width:0%;transition:width .6s ease"></div>
         </div>
+        <div style="display:flex;justify-content:space-between;margin-top:.35rem">
+          <span style="font-size:.68rem;color:var(--text-muted)">0%</span>
+          <span id="progreso-pct" style="font-size:.68rem;color:var(--primary-light);font-weight:600">0%</span>
+          <span style="font-size:.68rem;color:var(--text-muted)">100%</span>
+        </div>
+
       </div>
       <div class="result-details" id="result-details"></div>
     </div>
@@ -579,24 +593,32 @@ document.getElementById('validForm').addEventListener('submit',async(e)=>{
     {label:'DNI',val:dni},
     {label:'Dirección',val:direccionResumen},
   ]);
-  // Mostrar barra de progreso
-  document.getElementById('progreso-wrap').style.display='block';
-  document.getElementById('progreso-bar').style.width='0%';
-  document.getElementById('progreso-paso').textContent='Iniciando...';
-  document.getElementById('progreso-num').textContent='0 / 11';
-  // Iniciar polling de progreso
+  // Mostrar bloque de progreso y hacer scroll
+  const progresoWrap = document.getElementById('progreso-wrap');
+  progresoWrap.style.display = 'block';
+  document.getElementById('progreso-bar').style.width  = '0%';
+  document.getElementById('progreso-paso').textContent = 'Iniciando automatización...';
+  document.getElementById('progreso-icono').textContent = '⏳';
+  document.getElementById('progreso-num').textContent  = '0 / 12';
+  document.getElementById('progreso-pct').textContent  = '0%';
+  // Scroll al bloque de progreso para que sea visible
+  document.getElementById('result-card').scrollIntoView({behavior:'smooth', block:'start'});
+
+  // Iniciar polling de progreso (cada 1s)
   const progresoInterval = setInterval(async()=>{
     try{
-      const r=await fetch(`${SERVER}/progreso`);
-      const p=await r.json();
+      const r = await fetch(`${SERVER}/progreso`);
+      const p = await r.json();
       if(p.activo){
-        const pct=Math.round((p.num/p.total)*100);
-        document.getElementById('progreso-bar').style.width=pct+'%';
-        document.getElementById('progreso-paso').textContent=`${p.icono} ${p.paso}`;
-        document.getElementById('progreso-num').textContent=`${p.num} / ${p.total}`;
+        const pct = Math.round((p.num / p.total) * 100);
+        document.getElementById('progreso-bar').style.width  = pct + '%';
+        document.getElementById('progreso-paso').textContent = p.paso;
+        document.getElementById('progreso-icono').textContent = p.icono || '⚙️';
+        document.getElementById('progreso-num').textContent  = `${p.num} / ${p.total}`;
+        document.getElementById('progreso-pct').textContent  = pct + '%';
       }
     }catch(_){}
-  },1200);
+  }, 1000);
 
   // Guardar en Firestore con estado "pendiente"
   let docId='';

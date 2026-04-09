@@ -442,20 +442,24 @@ async function ejecutarValidacion(datos) {
   setProgreso(10, 'Seleccionando tipo de documento DNI...', '🪪');
   console.log('📌 Paso 9: Seleccionando tipo DNI...');
 
-  // Clic en el contenedor select2 para abrir el dropdown
-  await pg.waitForSelector('#select2-tipo_doc-container', { timeout: 10000 });
+  // Clic en el combobox de tipo_doc para abrir el dropdown
+  await pg.waitForSelector('span[aria-controls="select2-tipo_doc-container"]', { timeout: 10000 });
   await sleep(500);
-  await pg.click('#select2-tipo_doc-container');
-  await sleep(1200); // esperar que se despliegue el dropdown
+  await pg.click('span[aria-controls="select2-tipo_doc-container"]');
+  await sleep(1500); // esperar que se despliegue el dropdown con animación
 
-  // Esperar que aparezcan las opciones y seleccionar DNI
-  await pg.waitForSelector('#select2-tipo_doc-results', { visible: true, timeout: 10000 });
+  // Esperar que el listbox esté visible y seleccionar DNI por texto exacto
+  await pg.waitForFunction(() => {
+    const ul = document.getElementById('select2-tipo_doc-results');
+    return ul && ul.getAttribute('aria-hidden') === 'false';
+  }, { timeout: 10000 });
   await sleep(400);
+
   await pg.evaluate(() => {
     const opts = document.querySelectorAll('#select2-tipo_doc-results .select2-results__option');
     const dni  = [...opts].find(o => o.textContent.trim() === 'DNI');
-    if (dni) dni.click();
-    else throw new Error('Opción DNI no encontrada');
+    if (!dni) throw new Error('Opción DNI no encontrada en lista');
+    dni.click();
   });
   await sleep(1000);
   await shot(pg, '13_tipo_doc_dni');
@@ -502,6 +506,11 @@ async function ejecutarValidacion(datos) {
 
   console.log(`  📊 Score: ${scoreNum} | Aprobado (≥301): ${aprobado}`);
   console.log(`  📝 "${scoreTitulo}" — "${scoreDetalle}"`);
+
+  // ── Volver atrás para dejar la plataforma lista para la siguiente consulta ──
+  console.log('  ← Volviendo atrás para nueva consulta...');
+  await pg.goBack({ waitUntil: 'domcontentloaded', timeout: 15000 }).catch(() => {});
+  await sleep(1500);
 
   return {
     ok:             true,
