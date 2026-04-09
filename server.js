@@ -97,13 +97,13 @@ loadCreds();
 // ─────────────────────────────────────────
 // PROGRESO — estado actual de la automatización
 // ─────────────────────────────────────────
-let progreso = { num: 0, total: 11, paso: 'En espera', icono: '⏳', activo: false };
+let progreso = { num: 0, total: 12, paso: 'En espera', icono: '⏳', activo: false };
 function setProgreso(num, paso, icono = '⚙️') {
-  progreso = { num, total: 11, paso, icono, activo: true, ts: Date.now() };
+  progreso = { num, total: 12, paso, icono, activo: true, ts: Date.now() };
   console.log(`  [${num}/11] ${icono} ${paso}`);
 }
 function resetProgreso() {
-  progreso = { num: 0, total: 11, paso: 'En espera', icono: '⏳', activo: false };
+  progreso = { num: 0, total: 12, paso: 'En espera', icono: '⏳', activo: false };
 }
 
 // Carpeta screenshots
@@ -283,15 +283,13 @@ async function ejecutarValidacion(datos) {
   // ── PASO 1: Clic en menú "Ventas" ──────────────────────────────
   setProgreso(2, 'Navegando al menú Ventas...', '📋');
   console.log('📌 Paso 1: Navegando a Ventas...');
-  // Verificar sesión antes de navegar (WIN puede haber cerrado sesión)
   await checkSesionWIN(pg);
 
   try {
-    // Buscar el trigger del menú "Ventas" (data-kt-menu-trigger)
     await pg.waitForFunction(() => {
       const items = document.querySelectorAll('[data-kt-menu-trigger="click"]');
       return [...items].some(el => el.querySelector('.menu-title')?.textContent.trim() === 'Ventas');
-    }, { timeout: 10000 });
+    }, { timeout: 15000 });
 
     await pg.evaluate(() => {
       const items = document.querySelectorAll('[data-kt-menu-trigger="click"]');
@@ -299,100 +297,121 @@ async function ejecutarValidacion(datos) {
       if (ventas) ventas.querySelector('.menu-link').click();
     });
 
-    await sleep(800);
+    await sleep(2000); // esperar que el submenú se despliegue
     await shot(pg, '04_menu_ventas');
   } catch(e) {
     throw new Error('No se encontró el menú Ventas: ' + e.message);
   }
 
-  // ── PASO 2: Clic en "Añadir nuevo Lead" ───────────────────────
-  setProgreso(3, 'Abriendo formulario de nuevo Lead...', '📝');
-  console.log('📌 Paso 2: Clic en Nuevo Lead...');
+  // ── PASO 2: Clic en submenú "Nuevo Lead" (navega a la página) ──
+  setProgreso(3, 'Abriendo página Nuevo Lead...', '📝');
+  console.log('📌 Paso 2: Clic en submenú Nuevo Lead...');
   await pg.waitForSelector(WIN.sel.btn_nuevo_lead, { timeout: 10000 });
+  await sleep(500); // pequeña pausa antes de hacer clic
   await pg.click(WIN.sel.btn_nuevo_lead);
-  await sleep(1200); // esperar que abra el modal
-  await shot(pg, '05_modal_nuevo_lead');
+  await sleep(3000); // esperar que la página de leads cargue completamente
+  await shot(pg, '05_pagina_nuevo_lead');
 
-  // ── PASO 3: Llenar formulario según tipo ───────────────────────
+  // ── PASO 3: Clic en botón "Añadir nuevo Lead" (abre el modal) ──
+  setProgreso(4, 'Abriendo formulario (Añadir nuevo Lead)...', '📋');
+  console.log('📌 Paso 3: Clic en botón "Añadir nuevo Lead"...');
+  try {
+    await pg.waitForSelector('#btnNuevoLead', { timeout: 15000 });
+    await sleep(500);
+    await pg.click('#btnNuevoLead');
+    await sleep(2000); // esperar que el modal se abra con su animación
+    await shot(pg, '06_modal_abierto');
+  } catch(e) {
+    await shot(pg, '06_btn_no_encontrado');
+    throw new Error('No apareció el botón "Añadir nuevo Lead": ' + e.message);
+  }
+
+  // ── PASO 4: Llenar formulario según tipo ───────────────────────
   if (datos.tipo === 'coords') {
-    setProgreso(4, 'Ingresando coordenadas GPS...', '📍');
-    console.log('📌 Paso 3: Ingresando coordenadas...');
+    setProgreso(5, 'Ingresando coordenadas GPS...', '📍');
+    console.log('📌 Paso 4: Ingresando coordenadas...');
     const [lat, lon] = datos.direccion.split(',').map(s => s.trim());
 
     await pg.waitForSelector(WIN.sel.input_lat, { timeout: 10000 });
+    await sleep(500);
     await limpiarYEscribir(pg, WIN.sel.input_lat, lat);
+    await sleep(600);
     await limpiarYEscribir(pg, WIN.sel.input_lon, lon);
+    await sleep(600);
     await shot(pg, '06_coords_filled');
 
   } else {
-    setProgreso(4, 'Ingresando dirección por calle...', '🏠');
-    console.log('📌 Paso 3: Ingresando dirección por calle...');
+    setProgreso(5, 'Ingresando dirección por calle...', '🏠');
+    console.log('📌 Paso 4: Ingresando dirección por calle...');
 
     // Distrito
     await pg.waitForSelector(WIN.sel.input_distrito, { timeout: 10000 });
+    await sleep(500);
     await limpiarYEscribir(pg, WIN.sel.input_distrito, datos.distrito || '');
-    await sleep(600); // esperar autocomplete
+    await sleep(1000); // esperar autocomplete de distrito
 
     // Urbanización (opcional)
     if (datos.hhuu) {
       await limpiarYEscribir(pg, WIN.sel.input_hhuu, datos.hhuu);
-      await sleep(400);
+      await sleep(800);
     }
 
     // Nombre de calle
     await limpiarYEscribir(pg, WIN.sel.input_via, datos.via || '');
-    await sleep(400);
+    await sleep(800);
 
     // Número
     await limpiarYEscribir(pg, WIN.sel.input_numero, datos.numero || '');
+    await sleep(600);
     await shot(pg, '06_calle_filled');
   }
 
-  // ── PASO 4: Clic en Buscar ─────────────────────────────────────
-  setProgreso(5, 'Buscando ubicación en mapa...', '🗺️');
-  console.log('📌 Paso 4: Buscando en mapa...');
+  // ── PASO 5: Clic en Buscar ─────────────────────────────────────
+  setProgreso(6, 'Buscando ubicación en mapa...', '🗺️');
+  console.log('📌 Paso 5: Buscando en mapa...');
   await pg.waitForSelector(WIN.sel.btn_buscar, { timeout: 8000 });
+  await sleep(500);
   await pg.click(WIN.sel.btn_buscar);
-
-  // Esperar que aparezca el popup del mapa (máx 20s)
-  console.log('⏳ Esperando popup del mapa...');
+  await sleep(2500); // esperar que el mapa procese y genere el popup
   await shot(pg, '07_after_buscar');
 
-  // ── PASO 5: Clic en Confirmar del popup ───────────────────────
-  setProgreso(6, 'Confirmando punto en el mapa...', '📌');
-  console.log('📌 Paso 5: Esperando popup de confirmación...');
+  // ── PASO 6: Clic en Confirmar del popup ───────────────────────
+  setProgreso(7, 'Confirmando punto en el mapa...', '📌');
+  console.log('📌 Paso 6: Esperando popup de confirmación...');
   try {
     await pg.waitForSelector(WIN.sel.popup_confirmar, { timeout: 20000 });
+    await sleep(800); // esperar que el popup termine de renderizarse
     await shot(pg, '08_popup_visible');
 
-    // Leer texto del popup para devolverlo como resultado
     let popupTexto = '';
     try {
       popupTexto = await pg.$eval(WIN.sel.popup_content, el => {
-        // El texto es el primer nodo de texto del div (antes del input)
         return el.firstChild?.textContent?.trim() || el.textContent.trim();
       });
     } catch(_) {}
 
     console.log('  📍 Popup:', popupTexto);
     await pg.click(WIN.sel.popup_confirmar);
+    await sleep(2000); // esperar que el mapa registre la confirmación
     await shot(pg, '09_confirmar_clicked');
 
-    // ── PASO 6: Clic en Continuar ─────────────────────────────────
-    setProgreso(7, 'Avanzando a información del cliente...', '➡️');
-    console.log('📌 Paso 6: Esperando y clicando Continuar...');
+    // ── PASO 7: Clic en Continuar ─────────────────────────────────
+    setProgreso(8, 'Avanzando a información del cliente...', '➡️');
+    console.log('📌 Paso 7: Esperando y clicando Continuar...');
     await pg.waitForSelector(WIN.sel.btn_continuar, { timeout: 25000 });
+    await sleep(800);
     await shot(pg, '10_continuar_visible');
     await pg.click(WIN.sel.btn_continuar);
-    await sleep(1200);
+    await sleep(2500); // esperar que cargue el tab de información del cliente
     await shot(pg, '11_info_cliente_tab');
 
-    // ── PASO 7: Leer resultado de cobertura ───────────────────────
-    setProgreso(8, 'Verificando cobertura WIN...', '📡');
-    console.log('📌 Paso 7: Verificando cobertura...');
+    // ── PASO 8: Leer resultado de cobertura ───────────────────────
+    setProgreso(9, 'Verificando cobertura WIN...', '📡');
+    console.log('📌 Paso 8: Verificando cobertura...');
     let tieneCobertura = false;
     try {
-      await pg.waitForSelector(WIN.sel.alert_cobertura, { timeout: 10000 });
+      await pg.waitForSelector(WIN.sel.alert_cobertura, { timeout: 12000 });
+      await sleep(500);
       const cobText = await pg.$eval(WIN.sel.alert_cobertura, el => el.textContent.trim());
       tieneCobertura = cobText.toLowerCase().includes('cobertura');
       console.log('  📍 Cobertura:', cobText, '→', tieneCobertura);
@@ -410,45 +429,50 @@ async function ejecutarValidacion(datos) {
       };
     }
 
-    // ── PASO 8: Seleccionar tipo de documento "DNI" ───────────────
-    setProgreso(9, 'Seleccionando tipo de documento DNI...', '🪪');
-    console.log('📌 Paso 8: Seleccionando tipo DNI...');
+    // ── PASO 9: Seleccionar tipo de documento "DNI" ───────────────
+    setProgreso(10, 'Seleccionando tipo de documento DNI...', '🪪');
+    console.log('📌 Paso 9: Seleccionando tipo DNI...');
     try {
       await pg.click(WIN.sel.select2_tipo_doc);
+      await sleep(800); // esperar que se despliegue el dropdown
       await pg.waitForSelector('.select2-results__option', { timeout: 8000 });
+      await sleep(400);
       await pg.evaluate(() => {
         const opts = document.querySelectorAll('.select2-results__option');
         const dni  = [...opts].find(o => o.textContent.includes('DNI'));
         if (dni) dni.click();
         else throw new Error('Opción DNI no encontrada en dropdown');
       });
-      await sleep(500);
+      await sleep(1000); // esperar que el campo DNI aparezca habilitado
       await shot(pg, '13_tipo_doc_dni');
     } catch(e) {
       throw new Error('No se pudo seleccionar DNI en tipo de documento: ' + e.message);
     }
 
-    // ── PASO 9: Ingresar número de DNI ────────────────────────────
-    setProgreso(9, `Ingresando DNI ${datos.dni}...`, '🔢');
-    console.log('📌 Paso 9: Ingresando DNI:', datos.dni);
+    // ── PASO 10: Ingresar número de DNI ───────────────────────────
+    setProgreso(10, `Ingresando DNI ${datos.dni}...`, '🔢');
+    console.log('📌 Paso 10: Ingresando DNI:', datos.dni);
     if (!datos.dni) throw new Error('DNI no proporcionado para búsqueda de score');
     await limpiarYEscribir(pg, WIN.sel.input_dni, datos.dni);
+    await sleep(800); // esperar antes de buscar
     await shot(pg, '14_dni_ingresado');
 
-    // ── PASO 10: Clic en buscar score ─────────────────────────────
-    setProgreso(10, 'Consultando score crediticio...', '📊');
-    console.log('📌 Paso 10: Buscando score del cliente...');
+    // ── PASO 11: Clic en buscar score ─────────────────────────────
+    setProgreso(11, 'Consultando score crediticio...', '📊');
+    console.log('📌 Paso 11: Buscando score del cliente...');
     await pg.click(WIN.sel.btn_buscar_score);
+    await sleep(1500); // esperar que inicie la consulta
     await shot(pg, '15_score_buscando');
 
-    // ── PASO 11: Esperar resultado del score ──────────────────────
-    setProgreso(11, 'Esperando resultado del score...', '⏳');
+    // ── PASO 12: Esperar resultado del score ──────────────────────
+    setProgreso(12, 'Esperando resultado del score...', '⏳');
     console.log('⏳ Esperando resultado del score...');
     try {
       await pg.waitForFunction(() => {
         const el = document.getElementById('espere_por_favor');
         return el && el.textContent.trim() !== '' && !el.textContent.includes('Espere');
-      }, { timeout: 25000 });
+      }, { timeout: 30000 });
+      await sleep(500); // pequeña pausa para que el texto termine de renderizar
     } catch(_) {
       await shot(pg, '16_score_timeout');
       throw new Error('Tiempo de espera agotado al obtener el score del cliente');
