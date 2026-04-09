@@ -380,129 +380,6 @@ async function ejecutarValidacion(datos) {
   console.log('📌 Paso 6: Esperando popup de confirmación...');
   try {
     await pg.waitForSelector(WIN.sel.popup_confirmar, { timeout: 20000 });
-    await sleep(800); // esperar que el popup termine de renderizarse
-    await shot(pg, '08_popup_visible');
-
-    let popupTexto = '';
-    try {
-      popupTexto = await pg.$eval(WIN.sel.popup_content, el => {
-        return el.firstChild?.textContent?.trim() || el.textContent.trim();
-      });
-    } catch(_) {}
-
-    console.log('  📍 Popup:', popupTexto);
-    await pg.click(WIN.sel.popup_confirmar);
-    await sleep(2000); // esperar que el mapa registre la confirmación
-    await shot(pg, '09_confirmar_clicked');
-
-    // ── PASO 7: Clic en Continuar ─────────────────────────────────
-    setProgreso(8, 'Avanzando a información del cliente...', '➡️');
-    console.log('📌 Paso 7: Esperando y clicando Continuar...');
-    await pg.waitForSelector(WIN.sel.btn_continuar, { timeout: 25000 });
-    await sleep(800);
-    await shot(pg, '10_continuar_visible');
-    await pg.click(WIN.sel.btn_continuar);
-    await sleep(2500); // esperar que cargue el tab de información del cliente
-    await shot(pg, '11_info_cliente_tab');
-
-    // ── PASO 8: Leer resultado de cobertura ───────────────────────
-    setProgreso(9, 'Verificando cobertura WIN...', '📡');
-    console.log('📌 Paso 8: Verificando cobertura...');
-    let tieneCobertura = false;
-    try {
-      await pg.waitForSelector(WIN.sel.alert_cobertura, { timeout: 12000 });
-      await sleep(500);
-      const cobText = await pg.$eval(WIN.sel.alert_cobertura, el => el.textContent.trim());
-      tieneCobertura = cobText.toLowerCase().includes('cobertura');
-      console.log('  📍 Cobertura:', cobText, '→', tieneCobertura);
-    } catch(_) {
-      console.warn('  ⚠ No se encontró alerta de cobertura (asumiendo sin cobertura)');
-    }
-    await shot(pg, '12_cobertura_leida');
-
-    if (!tieneCobertura) {
-      return {
-        ok:        true,
-        resultado: 'sin_cobertura',
-        detalle:   'La dirección NO tiene cobertura WIN',
-        paso:      'cobertura_verificada',
-      };
-    }
-
-    // ── PASO 9: Seleccionar tipo de documento "DNI" ───────────────
-    setProgreso(10, 'Seleccionando tipo de documento DNI...', '🪪');
-    console.log('📌 Paso 9: Seleccionando tipo DNI...');
-    try {
-      await pg.click(WIN.sel.select2_tipo_doc);
-      await sleep(800); // esperar que se despliegue el dropdown
-      await pg.waitForSelector('.select2-results__option', { timeout: 8000 });
-      await sleep(400);
-      await pg.evaluate(() => {
-        const opts = document.querySelectorAll('.select2-results__option');
-        const dni  = [...opts].find(o => o.textContent.includes('DNI'));
-        if (dni) dni.click();
-        else throw new Error('Opción DNI no encontrada en dropdown');
-      });
-      await sleep(1000); // esperar que el campo DNI aparezca habilitado
-      await shot(pg, '13_tipo_doc_dni');
-    } catch(e) {
-      throw new Error('No se pudo seleccionar DNI en tipo de documento: ' + e.message);
-    }
-
-    // ── PASO 10: Ingresar número de DNI ───────────────────────────
-    setProgreso(10, `Ingresando DNI ${datos.dni}...`, '🔢');
-    console.log('📌 Paso 10: Ingresando DNI:', datos.dni);
-    if (!datos.dni) throw new Error('DNI no proporcionado para búsqueda de score');
-    await limpiarYEscribir(pg, WIN.sel.input_dni, datos.dni);
-    await sleep(800); // esperar antes de buscar
-    await shot(pg, '14_dni_ingresado');
-
-    // ── PASO 11: Clic en buscar score ─────────────────────────────
-    setProgreso(11, 'Consultando score crediticio...', '📊');
-    console.log('📌 Paso 11: Buscando score del cliente...');
-    await pg.click(WIN.sel.btn_buscar_score);
-    await sleep(1500); // esperar que inicie la consulta
-    await shot(pg, '15_score_buscando');
-
-    // ── PASO 12: Esperar resultado del score ──────────────────────
-    setProgreso(12, 'Esperando resultado del score...', '⏳');
-    console.log('⏳ Esperando resultado del score...');
-    try {
-      await pg.waitForFunction(() => {
-        const el = document.getElementById('espere_por_favor');
-        return el && el.textContent.trim() !== '' && !el.textContent.includes('Espere');
-      }, { timeout: 30000 });
-      await sleep(500); // pequeña pausa para que el texto termine de renderizar
-    } catch(_) {
-      await shot(pg, '16_score_timeout');
-      throw new Error('Tiempo de espera agotado al obtener el score del cliente');
-    }
-
-    const scoreTitulo  = await pg.$eval(WIN.sel.score_titulo,  el => el.textContent.trim()).catch(() => '');
-    const scoreDetalle = await pg.$eval(WIN.sel.score_detalle, el => el.textContent.trim()).catch(() => '');
-    await shot(pg, '16_score_resultado');
-
-    // Extraer número del score (busca el primer número en el texto)
-    const textoScore = scoreTitulo + ' ' + scoreDetalle;
-    const scoreMatch = textoScore.match(/\d+/);
-    const scoreNum   = scoreMatch ? parseInt(scoreMatch[0]) : null;
-    const aprobado   = scoreNum !== null && scoreNum >= 301;
-
-    console.log(`  📊 Score: ${scoreNum} | Aprobado (≥301): ${aprobado}`);
-    console.log(`  📝 "${scoreTitulo}" — "${scoreDetalle}"`);
-
-    return {
-      ok:             true,
-      resultado:      aprobado ? 'aprobado' : 'rechazado',
-      detalle:        `${scoreTitulo} — ${scoreDetalle}`,
-      scoreTitulo,
-      scoreDetalle,
-      scoreNum,
-      aprobado,
-      tieneCobertura: true,
-      paso:           'score_obtenido',
-    };
-
   } catch(e) {
     await shot(pg, '08_popup_timeout');
     const sinResultado = await pg.$('.no-results, .sin-cobertura, [class*="no-result"]').catch(() => null);
@@ -511,6 +388,132 @@ async function ejecutarValidacion(datos) {
     }
     throw new Error('No apareció el popup del mapa. Verifica la dirección o revisa screenshots. ' + e.message);
   }
+
+  await sleep(800);
+  await shot(pg, '08_popup_visible');
+
+  let popupTexto = '';
+  try {
+    popupTexto = await pg.$eval(WIN.sel.popup_content, el => {
+      return el.firstChild?.textContent?.trim() || el.textContent.trim();
+    });
+  } catch(_) {}
+  console.log('  📍 Popup:', popupTexto);
+
+  await pg.click(WIN.sel.popup_confirmar);
+  await sleep(2000);
+  await shot(pg, '09_confirmar_clicked');
+
+  // ── PASO 7: Clic en Continuar ─────────────────────────────────
+  setProgreso(8, 'Avanzando a información del cliente...', '➡️');
+  console.log('📌 Paso 7: Esperando y clicando Continuar...');
+  await pg.waitForSelector(WIN.sel.btn_continuar, { timeout: 25000 });
+  await sleep(800);
+  await shot(pg, '10_continuar_visible');
+  await pg.click(WIN.sel.btn_continuar);
+  await sleep(2500);
+  await shot(pg, '11_info_cliente_tab');
+
+  // ── PASO 8: Leer resultado de cobertura ───────────────────────
+  setProgreso(9, 'Verificando cobertura WIN...', '📡');
+  console.log('📌 Paso 8: Verificando cobertura...');
+  let tieneCobertura = false;
+  try {
+    await pg.waitForSelector(WIN.sel.alert_cobertura, { timeout: 12000 });
+    await sleep(500);
+    const cobText = await pg.$eval(WIN.sel.alert_cobertura, el => el.textContent.trim());
+    tieneCobertura = cobText.toLowerCase().includes('cobertura');
+    console.log('  📍 Cobertura:', cobText, '→', tieneCobertura);
+  } catch(_) {
+    console.warn('  ⚠ No se encontró alerta de cobertura (asumiendo sin cobertura)');
+  }
+  await shot(pg, '12_cobertura_leida');
+
+  if (!tieneCobertura) {
+    return {
+      ok:        true,
+      resultado: 'sin_cobertura',
+      detalle:   'La dirección NO tiene cobertura WIN',
+      paso:      'cobertura_verificada',
+    };
+  }
+
+  // ── PASO 9: Seleccionar tipo de documento "DNI" ───────────────
+  setProgreso(10, 'Seleccionando tipo de documento DNI...', '🪪');
+  console.log('📌 Paso 9: Seleccionando tipo DNI...');
+
+  // Clic en el contenedor select2 para abrir el dropdown
+  await pg.waitForSelector('#select2-tipo_doc-container', { timeout: 10000 });
+  await sleep(500);
+  await pg.click('#select2-tipo_doc-container');
+  await sleep(1200); // esperar que se despliegue el dropdown
+
+  // Esperar que aparezcan las opciones y seleccionar DNI
+  await pg.waitForSelector('#select2-tipo_doc-results', { visible: true, timeout: 10000 });
+  await sleep(400);
+  await pg.evaluate(() => {
+    const opts = document.querySelectorAll('#select2-tipo_doc-results .select2-results__option');
+    const dni  = [...opts].find(o => o.textContent.trim() === 'DNI');
+    if (dni) dni.click();
+    else throw new Error('Opción DNI no encontrada');
+  });
+  await sleep(1000);
+  await shot(pg, '13_tipo_doc_dni');
+
+  // ── PASO 10: Ingresar número de DNI ───────────────────────────
+  setProgreso(10, `Ingresando DNI ${datos.dni}...`, '🔢');
+  console.log('📌 Paso 10: Ingresando DNI:', datos.dni);
+  if (!datos.dni) throw new Error('DNI no proporcionado para búsqueda de score');
+  await limpiarYEscribir(pg, WIN.sel.input_dni, datos.dni);
+  await sleep(800);
+  await shot(pg, '14_dni_ingresado');
+
+  // ── PASO 11: Clic en buscar score ─────────────────────────────
+  setProgreso(11, 'Consultando score crediticio...', '📊');
+  console.log('📌 Paso 11: Buscando score del cliente...');
+  await pg.waitForSelector(WIN.sel.btn_buscar_score, { timeout: 5000 });
+  await sleep(300);
+  await pg.click(WIN.sel.btn_buscar_score);
+  await sleep(1500);
+  await shot(pg, '15_score_buscando');
+
+  // ── PASO 12: Esperar resultado del score ──────────────────────
+  setProgreso(12, 'Esperando resultado del score...', '⏳');
+  console.log('⏳ Esperando resultado del score...');
+  try {
+    await pg.waitForFunction(() => {
+      const el = document.getElementById('espere_por_favor');
+      return el && el.textContent.trim() !== '' && !el.textContent.includes('Espere');
+    }, { timeout: 30000 });
+    await sleep(500);
+  } catch(_) {
+    await shot(pg, '16_score_timeout');
+    throw new Error('Tiempo de espera agotado al obtener el score del cliente');
+  }
+
+  const scoreTitulo  = await pg.$eval(WIN.sel.score_titulo,  el => el.textContent.trim()).catch(() => '');
+  const scoreDetalle = await pg.$eval(WIN.sel.score_detalle, el => el.textContent.trim()).catch(() => '');
+  await shot(pg, '16_score_resultado');
+
+  const textoScore = scoreTitulo + ' ' + scoreDetalle;
+  const scoreMatch = textoScore.match(/\d+/);
+  const scoreNum   = scoreMatch ? parseInt(scoreMatch[0]) : null;
+  const aprobado   = scoreNum !== null && scoreNum >= 301;
+
+  console.log(`  📊 Score: ${scoreNum} | Aprobado (≥301): ${aprobado}`);
+  console.log(`  📝 "${scoreTitulo}" — "${scoreDetalle}"`);
+
+  return {
+    ok:             true,
+    resultado:      aprobado ? 'aprobado' : 'rechazado',
+    detalle:        `${scoreTitulo} — ${scoreDetalle}`,
+    scoreTitulo,
+    scoreDetalle,
+    scoreNum,
+    aprobado,
+    tieneCobertura: true,
+    paso:           'score_obtenido',
+  };
 }
 
 // Helper: limpiar campo y escribir
