@@ -140,11 +140,11 @@ async function getPage() {
         headless:        chromium.headless,
       };
     } else {
-      // Local: headless para que no tape el dashboard del trabajador
+      // Local: Chrome visible para supervisar la automatización
       launchOptions = {
-        headless:        true,
-        defaultViewport: { width: 1280, height: 900 },
-        args:            ['--no-sandbox', '--disable-setuid-sandbox'],
+        headless:        false,
+        defaultViewport: null,
+        args:            ['--no-sandbox', '--window-size=1100,750', '--window-position=200,50'],
       };
     }
 

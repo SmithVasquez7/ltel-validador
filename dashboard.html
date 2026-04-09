@@ -177,6 +177,31 @@ tr:hover td{background:rgba(255,255,255,.02)}
 </head>
 <body>
 
+<!-- BANNER FIJO DE PROGRESO (siempre visible sobre todo) -->
+<div id="banner-progreso" style="display:none;position:fixed;top:0;left:0;right:0;z-index:9999;background:linear-gradient(90deg,#1e1b4b,#312e81);border-bottom:2px solid #6366f1;box-shadow:0 4px 24px rgba(99,102,241,.4);padding:.65rem 1.5rem">
+  <div style="display:flex;align-items:center;gap:.85rem;max-width:1200px;margin:0 auto">
+    <!-- Ícono animado -->
+    <span id="banner-icono" style="font-size:1.4rem;animation:spin-lento 2s linear infinite;display:inline-block">⚙️</span>
+    <!-- Texto del paso -->
+    <div style="flex:1;min-width:0">
+      <div style="display:flex;align-items:center;gap:.6rem;flex-wrap:wrap">
+        <span style="font-size:.7rem;font-weight:700;color:#a5b4fc;text-transform:uppercase;letter-spacing:.05em">Automatización WIN</span>
+        <span id="banner-num" style="font-size:.68rem;background:rgba(99,102,241,.3);color:#c7d2fe;padding:.1rem .5rem;border-radius:20px;font-weight:600">0 / 12</span>
+      </div>
+      <div id="banner-paso" style="font-size:.88rem;font-weight:600;color:#e0e7ff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Iniciando...</div>
+    </div>
+    <!-- Porcentaje -->
+    <span id="banner-pct" style="font-size:1rem;font-weight:800;color:#a5b4fc;min-width:3rem;text-align:right">0%</span>
+  </div>
+  <!-- Barra de progreso delgada debajo -->
+  <div style="height:3px;background:rgba(255,255,255,.1);border-radius:0;margin-top:.5rem;overflow:hidden">
+    <div id="banner-bar" style="height:100%;background:linear-gradient(90deg,#818cf8,#38bdf8);width:0%;transition:width .6s ease"></div>
+  </div>
+</div>
+<style>
+@keyframes spin-lento{ 0%{transform:rotate(0deg)} 100%{transform:rotate(360deg)} }
+</style>
+
 <!-- MODAL CREDENCIALES WIN -->
 <div id="modal-creds" style="display:none;position:fixed;inset:0;z-index:200;background:rgba(0,0,0,.7);backdrop-filter:blur(8px);align-items:center;justify-content:center;padding:1rem">
   <div style="background:#0f1e35;border:1px solid rgba(255,255,255,.1);border-radius:16px;padding:2rem;width:100%;max-width:420px;box-shadow:0 30px 60px rgba(0,0,0,.5)">
@@ -593,7 +618,7 @@ document.getElementById('validForm').addEventListener('submit',async(e)=>{
     {label:'DNI',val:dni},
     {label:'Dirección',val:direccionResumen},
   ]);
-  // Mostrar bloque de progreso y hacer scroll
+  // Mostrar bloque de progreso interno y hacer scroll
   const progresoWrap = document.getElementById('progreso-wrap');
   progresoWrap.style.display = 'block';
   document.getElementById('progreso-bar').style.width  = '0%';
@@ -601,6 +626,16 @@ document.getElementById('validForm').addEventListener('submit',async(e)=>{
   document.getElementById('progreso-icono').textContent = '⏳';
   document.getElementById('progreso-num').textContent  = '0 / 12';
   document.getElementById('progreso-pct').textContent  = '0%';
+
+  // Mostrar banner fijo superior
+  const bannerProgreso = document.getElementById('banner-progreso');
+  bannerProgreso.style.display = 'block';
+  document.getElementById('banner-paso').textContent = 'Iniciando automatización...';
+  document.getElementById('banner-icono').textContent = '⏳';
+  document.getElementById('banner-num').textContent  = '0 / 12';
+  document.getElementById('banner-pct').textContent  = '0%';
+  document.getElementById('banner-bar').style.width  = '0%';
+
   // Scroll al bloque de progreso para que sea visible
   document.getElementById('result-card').scrollIntoView({behavior:'smooth', block:'start'});
 
@@ -611,11 +646,19 @@ document.getElementById('validForm').addEventListener('submit',async(e)=>{
       const p = await r.json();
       if(p.activo){
         const pct = Math.round((p.num / p.total) * 100);
+        const icono = p.icono || '⚙️';
+        // Actualizar bloque interno
         document.getElementById('progreso-bar').style.width  = pct + '%';
         document.getElementById('progreso-paso').textContent = p.paso;
-        document.getElementById('progreso-icono').textContent = p.icono || '⚙️';
+        document.getElementById('progreso-icono').textContent = icono;
         document.getElementById('progreso-num').textContent  = `${p.num} / ${p.total}`;
         document.getElementById('progreso-pct').textContent  = pct + '%';
+        // Actualizar banner fijo
+        document.getElementById('banner-bar').style.width  = pct + '%';
+        document.getElementById('banner-paso').textContent = p.paso;
+        document.getElementById('banner-icono').textContent = icono;
+        document.getElementById('banner-num').textContent  = `${p.num} / ${p.total}`;
+        document.getElementById('banner-pct').textContent  = pct + '%';
       }
     }catch(_){}
   }, 1000);
@@ -710,7 +753,8 @@ document.getElementById('validForm').addEventListener('submit',async(e)=>{
   }
 
   clearInterval(progresoInterval);
-  document.getElementById('progreso-wrap').style.display='none';
+  document.getElementById('progreso-wrap').style.display = 'none';
+  document.getElementById('banner-progreso').style.display = 'none';
   btn.disabled=false; btn.classList.remove('loading');
   loadHistorial(); loadStats();
 });
