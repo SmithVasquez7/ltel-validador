@@ -446,7 +446,9 @@ const firebaseConfig={
 firebase.initializeApp(firebaseConfig);
 const db=firebase.firestore();
 
-const SERVER='https://ltel-validador-win.onrender.com';
+const SERVER= window.location.hostname==='localhost'||window.location.hostname==='127.0.0.1'
+  ? 'http://localhost:3000'
+  : 'https://ltel-validador-win.onrender.com';
 
 // ── AUTH CHECK ───────────────────────────────────────────────────
 const _sess=sessionStorage.getItem('validadorUser');
