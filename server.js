@@ -53,7 +53,7 @@ const WIN = {
     input_lon:  '#gf_lon',
 
     // ── Botón Buscar mapa ──
-    btn_buscar: '#gf_buscar',
+    btn_buscar: '#gf_buscar_coordenadas',
 
     // ── Popup del mapa ──
     popup_confirmar: '.leaflet-popup-content .gf_btnPopup',
@@ -389,21 +389,27 @@ async function ejecutarValidacion(datos) {
     await pg.waitForSelector(WIN.sel.input_distrito, { timeout: 10000 });
     await sleep(500);
     await limpiarYEscribir(pg, WIN.sel.input_distrito, datos.distrito || '');
-    await sleep(5000); // esperar que el mapa cargue el distrito con calma
+    await sleep(3000); // esperar que aparezcan sugerencias
+    await seleccionarSugerencia(pg, WIN.sel.input_distrito, datos.distrito || '');
+    await sleep(2000);
 
     // Urbanización (opcional)
     if (datos.hhuu) {
       await limpiarYEscribir(pg, WIN.sel.input_hhuu, datos.hhuu);
-      await sleep(4000); // esperar que filtre la urbanización
+      await sleep(2500);
+      await seleccionarSugerencia(pg, WIN.sel.input_hhuu, datos.hhuu);
+      await sleep(1500);
     }
 
     // Nombre de calle
     await limpiarYEscribir(pg, WIN.sel.input_via, datos.via || '');
-    await sleep(4000); // esperar que cargue el nombre de vía
+    await sleep(2500);
+    await seleccionarSugerencia(pg, WIN.sel.input_via, datos.via || '');
+    await sleep(1500);
 
-    // Número
+    // Número (sin autocomplete, solo escribir)
     await limpiarYEscribir(pg, WIN.sel.input_numero, datos.numero || '');
-    await sleep(3000); // esperar que se complete la dirección exacta
+    await sleep(1000);
     await shot(pg, '06_calle_filled');
   }
 
@@ -643,6 +649,40 @@ async function limpiarYEscribir(pg, selector, texto) {
   await pg.keyboard.up('Control');
   await pg.keyboard.press('Backspace');
   if (texto) await pg.type(selector, texto, { delay: 45 });
+}
+
+// Helper: cerrar dropdown de autocomplete sin seleccionar nada y restaurar el valor original
+async function seleccionarSugerencia(pg, inputSel, texto) {
+  if (!texto) return;
+  try {
+    // Presionar Escape para cerrar el dropdown sin elegir ninguna sugerencia
+    await pg.focus(inputSel);
+    await sleep(200);
+    await pg.keyboard.press('Escape');
+    await sleep(400);
+
+    // Verificar que el campo aún tenga el valor original
+    const val = await pg.$eval(inputSel, el => el.value).catch(() => '');
+    if (!val || val.trim().length === 0) {
+      // El autocomplete borró el valor — restaurar
+      console.log(`  ⚠ Campo "${inputSel}" fue borrado por autocomplete — restaurando: "${texto}"`);
+      await limpiarYEscribir(pg, inputSel, texto);
+      await sleep(400);
+      await pg.keyboard.press('Escape');
+      await sleep(300);
+    } else {
+      console.log(`  ✓ Campo "${inputSel}" conservado: "${val}"`);
+    }
+  } catch (err) {
+    console.log(`  ⚠ seleccionarSugerencia error en "${inputSel}": ${err.message}`);
+    try {
+      const val = await pg.$eval(inputSel, el => el.value).catch(() => '');
+      if (!val || val.trim().length === 0) {
+        await limpiarYEscribir(pg, inputSel, texto);
+        await sleep(400);
+      }
+    } catch (_) {}
+  }
 }
 
 // ─────────────────────────────────────────
