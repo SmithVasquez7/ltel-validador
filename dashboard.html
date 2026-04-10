@@ -775,67 +775,56 @@ document.getElementById('validForm').addEventListener('submit',async(e)=>{
     const data=await resp.json();
 
     if(data.ok){
-      const tipo_r=data.resultado; // 'aprobado' | 'rechazado' | 'sin_cobertura'
+      const tipo_r    = data.resultado; // 'aprobado' | 'rechazado' | 'sin_cobertura'
       const esAprobado  = tipo_r==='aprobado';
-      const esSinCob    = tipo_r==='sin_cobertura';
       const esRechazado = tipo_r==='rechazado';
+      const scoreNum  = data.scoreNum != null ? Number(data.scoreNum) : null;
+      const aprobado  = data.aprobado === true;
+      const tieneCob  = data.tieneCobertura === true;
+      const horaStr   = new Date().toLocaleTimeString('es-PE',{hour:'2-digit',minute:'2-digit'});
 
-      // Guardar en Firestore con resultado completo
-      try{
-        const docRef=await db.collection('validaciones').add({
-          dni,
-          direccion: direccionResumen,
-          tipo:      tipoActual,
-          distrito, hhuu, via, numero,
-          observaciones: obs,
-          operador:      session.usuario,
-          operadorNombre:session.nombre||session.usuario,
-          resultado:       tipo_r,
-          detalleResultado:data.detalle||'',
-          scoreNum:        (data.scoreNum !== undefined && data.scoreNum !== null) ? Number(data.scoreNum) : null,
-          aprobado:        data.aprobado === true,
-          tieneCobertura:  data.tieneCobertura === true,
-          fechaISO:        new Date().toISOString(),
-          fecha:           firebase.firestore.FieldValue.serverTimestamp(),
-        });
-        docId=docRef.id;
-        console.log('✓ Firestore OK:', tipo_r, 'score:', data.scoreNum, 'ID:', docId);
-      }catch(fbErr){
-        console.error('❌ Firestore error:', fbErr);
-        // Mostrar el error en pantalla para diagnóstico
-        alert('⚠️ Error al guardar en Firestore:\n' + fbErr.code + '\n' + fbErr.message);
-      }
+      // ── 1. Añadir fila directamente a la tabla (inmediato, sin Firestore) ──
+      agregarFilaHistorial({ dni, direccion:direccionResumen, tipo:tipoActual,
+        resultado:tipo_r, scoreNum, aprobado, tieneCobertura:tieneCob,
+        operadorNombre:session.nombre||session.usuario, horaStr,
+        detalle:data.detalle||'' });
 
-      // ── Determinar estilo del resultado ──
+      // ── 2. Guardar en Firestore (best-effort, en paralelo) ──
+      db.collection('validaciones').add({
+        dni, direccion:direccionResumen, tipo:tipoActual,
+        distrito, hhuu, via, numero, observaciones:obs,
+        operador:session.usuario, operadorNombre:session.nombre||session.usuario,
+        resultado:tipo_r, detalleResultado:data.detalle||'',
+        scoreNum, aprobado, tieneCobertura:tieneCob,
+        fechaISO:new Date().toISOString(),
+        fecha:firebase.firestore.FieldValue.serverTimestamp(),
+      }).then(ref=>{ docId=ref.id; console.log('✓ Firestore guardado ID:', ref.id); })
+        .catch(e=>  console.warn('⚠ Firestore no guardó:', e.message));
+
+      // ── 3. Mostrar tarjeta de resultado ──
       let uiType, uiTitle, uiSub;
       if(esAprobado){
         uiType='success';
-        uiTitle=`✓ APROBADO — Score: ${data.scoreNum}`;
+        uiTitle=`✓ APROBADO — Score: ${scoreNum}`;
         uiSub='Tiene cobertura y cumple el score mínimo (≥301)';
       } else if(esRechazado){
         uiType='error';
-        uiTitle=`✗ RECHAZADO — Score: ${data.scoreNum??'N/D'}`;
+        uiTitle=`✗ RECHAZADO — Score: ${scoreNum??'N/D'}`;
         uiSub='Tiene cobertura pero el score es insuficiente (<301)';
       } else {
         uiType='error';
         uiTitle='✗ SIN COBERTURA';
         uiSub='La dirección no está dentro de la cobertura WIN';
       }
-
-      const scoreLabel = data.scoreNum!=null ? `${data.scoreNum} (${data.aprobado?'✅ Aprobado':'❌ Rechazado'})` : '—';
-
-      showResult(uiType, uiTitle, uiSub,
-        [
-          {label:'DNI',val:dni},
-          {label:'Dirección',val:direccionResumen},
-          {label:'Cobertura WIN',val:data.tieneCobertura?'✅ Tiene cobertura':'❌ Sin cobertura'},
-          {label:'Score cliente',val:scoreLabel},
-          {label:'Detalle',val:data.detalle||'—'},
-          {label:'ID Registro',val:docId?docId.slice(0,8).toUpperCase():'--'},
-          {label:'Operador',val:session.nombre||session.usuario},
-          {label:'Hora',val:new Date().toLocaleTimeString('es-PE')},
-        ]
-      );
+      showResult(uiType, uiTitle, uiSub, [
+        {label:'DNI',val:dni},
+        {label:'Dirección',val:direccionResumen},
+        {label:'Cobertura WIN',val:tieneCob?'✅ Tiene cobertura':'❌ Sin cobertura'},
+        {label:'Score cliente',val:scoreNum!=null?`${scoreNum} (${aprobado?'✅ Aprobado':'❌ Rechazado'})`:'—'},
+        {label:'Detalle score',val:data.detalle||'—'},
+        {label:'Operador',val:session.nombre||session.usuario},
+        {label:'Hora',val:horaStr},
+      ]);
     } else {
       showResult('error','Error en validación',data.error||'Error desconocido',[
         {label:'DNI',val:dni},{label:'Dirección',val:direccionResumen},
@@ -956,6 +945,30 @@ async function loadStats(){
 }
 
 function escHtml(s){return String(s).replace(/[<>&"']/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;',"'":'&#39;'}[c]));}
+
+// Añade una fila al inicio de la tabla del historial directamente en el DOM
+function agregarFilaHistorial(d) {
+  const tbody = document.getElementById('historial-body');
+  // Quitar mensaje "sin validaciones" si existe
+  if(tbody.querySelector('.empty-state')) tbody.innerHTML='';
+
+  const badgeMap = {
+    'aprobado':     '<span class="badge badge-success"><i class="fas fa-check-circle"></i> Aprobado</span>',
+    'rechazado':    '<span class="badge badge-error"><i class="fas fa-user-times"></i> Score bajo</span>',
+    'sin_cobertura':'<span class="badge badge-error"><i class="fas fa-times"></i> Sin cobertura</span>',
+  };
+  const tr = document.createElement('tr');
+  tr.style.cursor='pointer';
+  tr.innerHTML=`
+    <td style="font-weight:600;color:#fff">${escHtml(d.dni||'')}</td>
+    <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escHtml(d.direccion||'')}">${escHtml(d.direccion||'')}</td>
+    <td>${d.tipo==='coords'?'<i class="fas fa-crosshairs" style="color:var(--primary-light)"></i> Coords':'<i class="fas fa-road" style="color:var(--primary-light)"></i> Calle'}</td>
+    <td>${badgeMap[d.resultado]||'<span class="badge badge-pending">Pendiente</span>'}</td>
+    <td>${escHtml(d.operadorNombre||'')}</td>
+    <td>${escHtml(d.horaStr||'')}</td>`;
+  tr.addEventListener('click', ()=> abrirDetalle('', d));
+  tbody.prepend(tr);
+}
 
 // ── Modal detalle de validación ──
 function abrirDetalle(id, d) {
