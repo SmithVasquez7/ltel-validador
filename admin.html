@@ -402,16 +402,38 @@ tr:last-child td{border-bottom:none}
         </div>
 
         <div class="card">
-          <div class="card-title" style="margin-bottom:1.25rem"><i class="fas fa-server"></i> Estado del servidor</div>
+          <div class="card-title" style="margin-bottom:1.25rem"><i class="fas fa-server"></i> Servidor de automatización</div>
 
-          <div id="server-detail" style="font-size:.85rem;line-height:1.9">
+          <!-- URL del servidor -->
+          <div class="form-group">
+            <label class="form-label"><i class="fas fa-link" style="color:var(--primary-light)"></i> URL del servidor <span style="font-size:.7rem;color:var(--text-muted)">(se aplica a todos los trabajadores)</span></label>
+            <div style="display:flex;gap:.5rem">
+              <div class="form-input-wrap" style="flex:1">
+                <i class="fas fa-globe form-icon"></i>
+                <input type="text" id="input-server-url" class="form-input" placeholder="https://xxxx.ngrok-free.app  ó  http://192.168.1.5:3000">
+              </div>
+              <button class="btn-save" style="white-space:nowrap;padding:.65rem 1rem;margin:0" onclick="guardarServerURL()">
+                <i class="fas fa-save"></i> Guardar
+              </button>
+            </div>
+            <div style="font-size:.72rem;color:var(--text-muted);margin-top:.35rem"><i class="fas fa-info-circle" style="color:var(--primary-light)"></i> Sin barra al final. Usa ngrok o la IP local de tu PC.</div>
+          </div>
+          <div class="alert-box success" id="alert-url-ok" style="display:none">
+            <i class="fas fa-check-circle"></i> URL guardada. Todos los trabajadores la usarán automáticamente.
+          </div>
+          <div class="alert-box error" id="alert-url-err" style="display:none">
+            <i class="fas fa-exclamation-circle"></i> <span id="alert-url-err-text">Error al guardar.</span>
+          </div>
+
+          <!-- Estado del servidor -->
+          <div id="server-detail" style="font-size:.85rem;line-height:1.9;margin-top:1.25rem;border-top:1px solid var(--border);padding-top:1rem">
             <div style="display:flex;justify-content:space-between;border-bottom:1px solid var(--border);padding:.5rem 0">
               <span style="color:var(--text-muted)">Estado</span>
-              <span id="srv-estado">Verificando...</span>
+              <span id="srv-estado">—</span>
             </div>
             <div style="display:flex;justify-content:space-between;border-bottom:1px solid var(--border);padding:.5rem 0">
-              <span style="color:var(--text-muted)">URL</span>
-              <span style="color:var(--primary-light);font-size:.75rem" id="srv-url">—</span>
+              <span style="color:var(--text-muted)">URL activa</span>
+              <span style="color:var(--primary-light);font-size:.75rem;word-break:break-all" id="srv-url">—</span>
             </div>
             <div style="display:flex;justify-content:space-between;border-bottom:1px solid var(--border);padding:.5rem 0">
               <span style="color:var(--text-muted)">Sesión WIN</span>
@@ -423,7 +445,7 @@ tr:last-child td{border-bottom:none}
             </div>
           </div>
 
-          <button class="btn-save" style="margin-top:1.25rem;background:linear-gradient(135deg,#475569,#334155)" onclick="checkServer()">
+          <button class="btn-save" style="margin-top:1rem;background:linear-gradient(135deg,#475569,#334155)" onclick="checkServer()">
             <i class="fas fa-sync-alt"></i> Verificar servidor
           </button>
         </div>
@@ -446,9 +468,39 @@ const firebaseConfig={
 firebase.initializeApp(firebaseConfig);
 const db=firebase.firestore();
 
-const SERVER= window.location.hostname==='localhost'||window.location.hostname==='127.0.0.1'
-  ? 'http://localhost:3000'
-  : 'https://ltel-validador-win.onrender.com';
+let SERVER = (window.location.hostname==='localhost'||window.location.hostname==='127.0.0.1')
+  ? 'http://localhost:3000' : '';
+
+async function cargarServerURL(){
+  if(SERVER) return; // local ya tiene URL
+  try{
+    const snap = await db.collection('config').doc('servidor').get({ source:'server' });
+    if(snap.exists && snap.data().url){
+      SERVER = snap.data().url;
+      document.getElementById('input-server-url').value = SERVER;
+      document.getElementById('srv-url').textContent = SERVER;
+    }
+  }catch(e){ console.warn('No se pudo leer URL servidor:', e.message); }
+}
+
+async function guardarServerURL(){
+  const url = document.getElementById('input-server-url').value.trim().replace(/\/$/,'');
+  if(!url){ alert('Ingresa una URL válida'); return; }
+  try{
+    await db.collection('config').doc('servidor').set({
+      url, actualizadoPor: session.usuario, fecha: new Date().toISOString()
+    });
+    SERVER = url;
+    document.getElementById('srv-url').textContent = url;
+    document.getElementById('alert-url-ok').style.display = 'flex';
+    document.getElementById('alert-url-err').style.display = 'none';
+    setTimeout(()=>{ document.getElementById('alert-url-ok').style.display='none'; }, 4000);
+    checkServer();
+  }catch(e){
+    document.getElementById('alert-url-err-text').textContent = e.message;
+    document.getElementById('alert-url-err').style.display = 'flex';
+  }
+}
 
 // ── AUTH CHECK ───────────────────────────────────────────────────
 const _sess=sessionStorage.getItem('validadorUser');
@@ -493,7 +545,7 @@ const badgeMap={
 // ── DASHBOARD ────────────────────────────────────────────────────
 async function loadDashboard(){
   const hoy=new Date();hoy.setHours(0,0,0,0);
-  const snap=await db.collection('validaciones')
+  const snap=await db.collection('validacionesWIN')
     .where('fechaISO','>=',hoy.toISOString())
     .orderBy('fechaISO','desc')
     .limit(100).get().catch(()=>null);
@@ -543,7 +595,7 @@ async function loadHistorial(){
   const fRes=document.getElementById('f-resultado').value;
   const fFecha=document.getElementById('f-fecha').value;
 
-  let q=db.collection('validaciones').orderBy('fechaISO','desc');
+  let q=db.collection('validacionesWIN').orderBy('fechaISO','desc');
 
   if(fOp)q=q.where('operador','==',fOp);
   if(fRes)q=q.where('resultado','==',fRes);
@@ -604,7 +656,7 @@ async function loadTrabajadores(){
   tbody.innerHTML='<tr class="loading-row"><td colspan="8"><i class="fas fa-spinner fa-spin"></i> Cargando...</td></tr>';
 
   // Obtener todas las validaciones
-  const snap=await db.collection('validaciones').orderBy('fechaISO','desc').get().catch(()=>null);
+  const snap=await db.collection('validacionesWIN').orderBy('fechaISO','desc').get().catch(()=>null);
   if(!snap){tbody.innerHTML='<tr class="loading-row"><td colspan="8">Error al cargar datos.</td></tr>';return;}
 
   // Agrupar por operador
@@ -742,8 +794,10 @@ async function checkServer(){
 // ── INIT ─────────────────────────────────────────────────────────
 loadDashboard();
 loadLastWinUpdate();
-checkServer();
-setInterval(checkServer, 60000); // verificar cada 60s
+cargarServerURL().then(() => {
+  checkServer();
+  setInterval(checkServer, 60000); // verificar cada 60s
+});
 </script>
 </body>
 </html>
