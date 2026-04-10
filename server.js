@@ -48,9 +48,6 @@ const WIN = {
     input_via:       '#gf_via',
     input_numero:    '#gf_numero',
 
-    // ── Pestaña Coordenadas (tab que activa el formulario de coords) ──
-    tab_coords: '#gf_tab_coordenadas, [data-tab="coordenadas"], [href="#coordenadas"], input[value="coordenadas"], label[for*="coord"]',
-
     // ── Formulario Coordenadas ──
     input_lat:  '#gf_lat',
     input_lon:  '#gf_lon',
@@ -101,13 +98,13 @@ loadCreds();
 // ─────────────────────────────────────────
 // PROGRESO — estado actual de la automatización
 // ─────────────────────────────────────────
-let progreso = { num: 0, total: 12, paso: 'En espera', icono: '⏳', activo: false };
+let progreso = { num: 0, total: 12, paso: 'En espera', icono: '⏳', activo: false, operadorActivo: '', operadorNombreActivo: '' };
 function setProgreso(num, paso, icono = '⚙️') {
-  progreso = { num, total: 12, paso, icono, activo: true, ts: Date.now() };
+  progreso = { ...progreso, num, total: 12, paso, icono, activo: true, ts: Date.now() };
   console.log(`  [${num}/11] ${icono} ${paso}`);
 }
 function resetProgreso() {
-  progreso = { num: 0, total: 12, paso: 'En espera', icono: '⏳', activo: false };
+  progreso = { num: 0, total: 12, paso: 'En espera', icono: '⏳', activo: false, operadorActivo: '', operadorNombreActivo: '' };
 }
 
 // Captura en vivo — se actualiza cada vez que el dashboard la pide (máx cada 2s)
@@ -312,6 +309,9 @@ async function checkSesionWIN(pg) {
 // ─────────────────────────────────────────
 async function ejecutarValidacion(datos) {
   resetProgreso();
+  // Registrar quién está corriendo esta validación
+  progreso.operadorActivo      = datos.operador      || '';
+  progreso.operadorNombreActivo = datos.operadorNombre || datos.operador || '';
   const pg = await getPage();
 
   // Login inicial o re-login si la sesión expiró
@@ -377,27 +377,7 @@ async function ejecutarValidacion(datos) {
     console.log('📌 Paso 4: Ingresando coordenadas...');
     const [lat, lon] = datos.direccion.split(',').map(s => s.trim());
 
-    // Activar la pestaña/tab de coordenadas si existe
-    const tabActivado = await pg.evaluate(() => {
-      const posibles = [
-        ...document.querySelectorAll('a[href*="coord"], button[id*="coord"], li[id*="coord"], [data-tab*="coord"], label[for*="coord"], input[value*="coord"]'),
-      ];
-      // También buscar por texto "Coordenadas" en tabs/botones
-      const porTexto = [...document.querySelectorAll('a, button, li, label, span')].filter(el =>
-        el.offsetParent !== null && (el.textContent||'').trim().toLowerCase() === 'coordenadas'
-      );
-      const target = posibles[0] || porTexto[0];
-      if (target) { target.click(); return true; }
-      return false;
-    });
-    if (tabActivado) {
-      console.log('  ✓ Tab coordenadas activado');
-      await sleep(800);
-    } else {
-      console.log('  ⚠ No se encontró tab de coordenadas — intentando directo');
-    }
-
-    await pg.waitForSelector(WIN.sel.input_lat, { visible: true, timeout: 10000 });
+    await pg.waitForSelector(WIN.sel.input_lat, { timeout: 10000 });
     await sleep(500);
     await limpiarYEscribir(pg, WIN.sel.input_lat, lat);
     await sleep(600);

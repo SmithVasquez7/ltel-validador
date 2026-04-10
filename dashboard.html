@@ -771,23 +771,30 @@ document.getElementById('validForm').addEventListener('submit',async(e)=>{
       // ── Gestión del banner de cola ──────────────────────────────
       const bannerCola = document.getElementById('banner-cola');
       const bannerProg = document.getElementById('banner-progreso');
-      if(p.colaOcupada && !p.activo){
-        // El sistema está ocupado pero NO por esta validación (está esperando)
+
+      // ¿Está corriendo una validación de OTRO trabajador?
+      const esDeOtro = p.activo && p.operadorActivo && p.operadorActivo !== session.usuario;
+      // Mostrar espera si: cola ocupada Y (aún no hay nadie corriendo O está corriendo otro)
+      const enEspera = p.colaOcupada && (!p.activo || esDeOtro);
+
+      if(enEspera){
         const segsEspera = Math.floor((Date.now() - inicioEspera) / 1000);
         const minutos = Math.floor(segsEspera / 60);
         const segs    = segsEspera % 60;
-        const tiempoStr = minutos > 0
-          ? `${minutos}m ${segs}s esperando`
-          : `${segs}s esperando`;
+        const tiempoStr = minutos > 0 ? `${minutos}m ${segs}s esperando` : `${segs}s esperando`;
+        const quienCorre = p.operadorNombreActivo ? ` (${p.operadorNombreActivo} está validando)` : '';
         bannerCola.style.display = 'block';
         bannerProg.style.display = 'none';
         document.getElementById('banner-cola-espera').textContent = tiempoStr;
+        document.getElementById('banner-cola-texto').textContent  =
+          `Otro trabajador está realizando una validación${quienCorre}. Tu solicitud está en cola, espera un momento...`;
         return;
       } else {
         bannerCola.style.display = 'none';
       }
 
-      if(p.activo){
+      // Solo mostrar progreso si la validación activa es del trabajador actual
+      if(p.activo && (!p.operadorActivo || p.operadorActivo === session.usuario)){
         bannerProg.style.display = 'block';
         const pct = Math.round((p.num / p.total) * 100);
         const icono = p.icono || '⚙️';
