@@ -48,6 +48,9 @@ const WIN = {
     input_via:       '#gf_via',
     input_numero:    '#gf_numero',
 
+    // ── Pestaña Coordenadas (tab que activa el formulario de coords) ──
+    tab_coords: '#gf_tab_coordenadas, [data-tab="coordenadas"], [href="#coordenadas"], input[value="coordenadas"], label[for*="coord"]',
+
     // ── Formulario Coordenadas ──
     input_lat:  '#gf_lat',
     input_lon:  '#gf_lon',
@@ -374,7 +377,27 @@ async function ejecutarValidacion(datos) {
     console.log('📌 Paso 4: Ingresando coordenadas...');
     const [lat, lon] = datos.direccion.split(',').map(s => s.trim());
 
-    await pg.waitForSelector(WIN.sel.input_lat, { timeout: 10000 });
+    // Activar la pestaña/tab de coordenadas si existe
+    const tabActivado = await pg.evaluate(() => {
+      const posibles = [
+        ...document.querySelectorAll('a[href*="coord"], button[id*="coord"], li[id*="coord"], [data-tab*="coord"], label[for*="coord"], input[value*="coord"]'),
+      ];
+      // También buscar por texto "Coordenadas" en tabs/botones
+      const porTexto = [...document.querySelectorAll('a, button, li, label, span')].filter(el =>
+        el.offsetParent !== null && (el.textContent||'').trim().toLowerCase() === 'coordenadas'
+      );
+      const target = posibles[0] || porTexto[0];
+      if (target) { target.click(); return true; }
+      return false;
+    });
+    if (tabActivado) {
+      console.log('  ✓ Tab coordenadas activado');
+      await sleep(800);
+    } else {
+      console.log('  ⚠ No se encontró tab de coordenadas — intentando directo');
+    }
+
+    await pg.waitForSelector(WIN.sel.input_lat, { visible: true, timeout: 10000 });
     await sleep(500);
     await limpiarYEscribir(pg, WIN.sel.input_lat, lat);
     await sleep(600);
@@ -804,6 +827,17 @@ async function ejecutarConCola(datos) {
   colaOcupada = true;
   try {
     return await ejecutarValidacion(datos);
+  } catch(err) {
+    // Al fallar, resetear estado del browser para no dejar basura para la siguiente validación
+    console.log('⚠ Validación falló — reseteando estado del browser...');
+    try {
+      if (page && !page.isClosed()) {
+        await page.goto(WIN.url_login, { waitUntil: 'domcontentloaded', timeout: 8000 }).catch(() => {});
+        loggedIn = false; // forzar re-login en la próxima validación
+      }
+    } catch(_) {}
+    resetProgreso();
+    throw err; // re-lanzar para que el endpoint maneje el error
   } finally {
     colaOcupada = false;
     colaEsperando = Math.max(0, colaEsperando - 1);
@@ -846,12 +880,10 @@ app.post('/validar', async (req, res) => {
         console.log('✓ Reintento exitoso:', resultado.resultado);
         return res.json({ ...resultado, dni, tipo });
       } catch(e2) {
-        colaOcupada = false;
         console.error('✗ Reintento fallido:', e2.message);
         return res.status(500).json({ ok: false, error: e2.message });
       }
     }
-    colaOcupada = false;
     res.status(500).json({ ok: false, error: e.message });
   }
 });
