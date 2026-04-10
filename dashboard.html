@@ -177,6 +177,18 @@ tr:hover td{background:rgba(255,255,255,.02)}
 </head>
 <body>
 
+<!-- BANNER FIJO DE COLA (otro trabajador está usando el sistema) -->
+<div id="banner-cola" style="display:none;position:fixed;top:0;left:0;right:0;z-index:10000;background:linear-gradient(90deg,#7c2d12,#9a3412);border-bottom:2px solid #f97316;box-shadow:0 4px 24px rgba(249,115,22,.4);padding:.65rem 1.5rem">
+  <div style="display:flex;align-items:center;gap:.85rem;max-width:1200px;margin:0 auto">
+    <span style="font-size:1.4rem;animation:spin-lento 2s linear infinite;display:inline-block">⏳</span>
+    <div style="flex:1">
+      <div style="font-size:.7rem;font-weight:700;color:#fed7aa;text-transform:uppercase;letter-spacing:.05em">Sistema ocupado</div>
+      <div id="banner-cola-texto" style="font-size:.88rem;font-weight:600;color:#ffedd5">Otro trabajador está realizando una validación. Tu solicitud está en cola, espera un momento...</div>
+    </div>
+    <span id="banner-cola-espera" style="font-size:.85rem;font-weight:700;color:#fed7aa;white-space:nowrap"></span>
+  </div>
+</div>
+
 <!-- BANNER FIJO DE PROGRESO (siempre visible sobre todo) -->
 <div id="banner-progreso" style="display:none;position:fixed;top:0;left:0;right:0;z-index:9999;background:linear-gradient(90deg,#1e1b4b,#312e81);border-bottom:2px solid #6366f1;box-shadow:0 4px 24px rgba(99,102,241,.4);padding:.65rem 1.5rem">
   <div style="display:flex;align-items:center;gap:.85rem;max-width:1200px;margin:0 auto">
@@ -730,12 +742,36 @@ document.getElementById('validForm').addEventListener('submit',async(e)=>{
 
   let docId='';
 
+  // Tiempo de inicio para mostrar cuánto lleva esperando
+  const inicioEspera = Date.now();
+
   // Iniciar polling de progreso (cada 1s)
   const progresoInterval = setInterval(async()=>{
     try{
       const r = await fetch(`${SERVER}/progreso`);
       const p = await r.json();
+
+      // ── Gestión del banner de cola ──────────────────────────────
+      const bannerCola = document.getElementById('banner-cola');
+      const bannerProg = document.getElementById('banner-progreso');
+      if(p.colaOcupada && !p.activo){
+        // El sistema está ocupado pero NO por esta validación (está esperando)
+        const segsEspera = Math.floor((Date.now() - inicioEspera) / 1000);
+        const minutos = Math.floor(segsEspera / 60);
+        const segs    = segsEspera % 60;
+        const tiempoStr = minutos > 0
+          ? `${minutos}m ${segs}s esperando`
+          : `${segs}s esperando`;
+        bannerCola.style.display = 'block';
+        bannerProg.style.display = 'none';
+        document.getElementById('banner-cola-espera').textContent = tiempoStr;
+        return;
+      } else {
+        bannerCola.style.display = 'none';
+      }
+
       if(p.activo){
+        bannerProg.style.display = 'block';
         const pct = Math.round((p.num / p.total) * 100);
         const icono = p.icono || '⚙️';
         // Actualizar bloque interno
@@ -849,6 +885,7 @@ document.getElementById('validForm').addEventListener('submit',async(e)=>{
   document.getElementById('progreso-wrap').style.display  = 'none';
   document.getElementById('liveview-wrap').style.display  = 'none';
   document.getElementById('banner-progreso').style.display = 'none';
+  document.getElementById('banner-cola').style.display     = 'none';
   btn.disabled=false; btn.classList.remove('loading');
   setTimeout(()=>{ loadHistorial(); loadStats(); }, 3000);
 });

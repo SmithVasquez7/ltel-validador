@@ -653,36 +653,96 @@ async function limpiarYEscribir(pg, selector, texto) {
   if (texto) await pg.type(selector, texto, { delay: 45 });
 }
 
-// Helper: cerrar dropdown de autocomplete sin seleccionar nada y restaurar el valor original
+// Helper: elegir la sugerencia más parecida al texto ingresado
 async function seleccionarSugerencia(pg, inputSel, texto) {
   if (!texto) return;
+  const textNorm = texto.trim().toLowerCase();
+
   try {
-    // Presionar Escape para cerrar el dropdown sin elegir ninguna sugerencia
+    // Esperar hasta 3s a que aparezca al menos un item de sugerencia visible
+    let intentos = 0;
+    let items = [];
+    while (intentos < 6) {
+      items = await pg.evaluate((inputSel) => {
+        const input = document.querySelector(inputSel);
+        if (!input) return [];
+
+        // GeoFinder mete las sugerencias en un <ul> hermano o en un contenedor cercano
+        const root = input.closest('td, .form-group, .input-group, div') || document.body;
+        const candidates = [
+          ...document.querySelectorAll('ul.ui-autocomplete li.ui-menu-item'),
+          ...document.querySelectorAll('.autocomplete-items div, .autocomplete-list li'),
+          ...document.querySelectorAll('[class*="suggest"] li, [class*="suggest"] div'),
+          ...document.querySelectorAll('[class*="autocomplete"] li, [class*="autocomplete"] div'),
+          ...document.querySelectorAll('.tt-suggestion, .dropdown-item'),
+          ...root.querySelectorAll('li, [role="option"]'),
+        ];
+
+        return candidates
+          .filter(el => el.offsetParent !== null && (el.textContent || '').trim().length > 0)
+          .map(el => ({
+            text: (el.textContent || '').trim(),
+            tag:  el.tagName,
+            cls:  el.className,
+          }));
+      }, inputSel);
+
+      if (items.length > 0) break;
+      await sleep(500);
+      intentos++;
+    }
+
+    if (items.length === 0) {
+      console.log(`  ⚠ No aparecieron sugerencias para "${inputSel}" — usando ArrowDown+Enter`);
+      await pg.focus(inputSel);
+      await pg.keyboard.press('ArrowDown');
+      await sleep(400);
+      await pg.keyboard.press('Enter');
+      await sleep(400);
+      return;
+    }
+
+    // Buscar la sugerencia con mejor coincidencia con el texto ingresado
+    let mejorIdx  = 0;
+    let mejorScore = -1;
+    items.forEach((item, i) => {
+      const t = item.text.toLowerCase();
+      let score = 0;
+      if (t === textNorm)                     score = 100; // exacta
+      else if (t.startsWith(textNorm))        score = 80;
+      else if (t.includes(textNorm))          score = 60;
+      else if (textNorm.includes(t))          score = 40;
+      else {
+        // contar palabras en común
+        const wordsA = textNorm.split(/\s+/);
+        const wordsB = t.split(/\s+/);
+        score = wordsA.filter(w => wordsB.some(b => b.includes(w) || w.includes(b))).length;
+      }
+      if (score > mejorScore) { mejorScore = score; mejorIdx = i; }
+    });
+
+    console.log(`  → Sugerencias para "${texto}": ${items.map(i=>i.text).join(' | ')}`);
+    console.log(`  ✓ Eligiendo: "${items[mejorIdx].text}" (score ${mejorScore})`);
+
+    // Navegar con teclado hasta la posición correcta y presionar Enter
     await pg.focus(inputSel);
     await sleep(200);
-    await pg.keyboard.press('Escape');
-    await sleep(400);
-
-    // Verificar que el campo aún tenga el valor original
-    const val = await pg.$eval(inputSel, el => el.value).catch(() => '');
-    if (!val || val.trim().length === 0) {
-      // El autocomplete borró el valor — restaurar
-      console.log(`  ⚠ Campo "${inputSel}" fue borrado por autocomplete — restaurando: "${texto}"`);
-      await limpiarYEscribir(pg, inputSel, texto);
-      await sleep(400);
-      await pg.keyboard.press('Escape');
-      await sleep(300);
-    } else {
-      console.log(`  ✓ Campo "${inputSel}" conservado: "${val}"`);
+    for (let i = 0; i <= mejorIdx; i++) {
+      await pg.keyboard.press('ArrowDown');
+      await sleep(150);
     }
+    await pg.keyboard.press('Enter');
+    await sleep(500);
+
   } catch (err) {
     console.log(`  ⚠ seleccionarSugerencia error en "${inputSel}": ${err.message}`);
+    // Fallback: ArrowDown + Enter
     try {
-      const val = await pg.$eval(inputSel, el => el.value).catch(() => '');
-      if (!val || val.trim().length === 0) {
-        await limpiarYEscribir(pg, inputSel, texto);
-        await sleep(400);
-      }
+      await pg.focus(inputSel);
+      await pg.keyboard.press('ArrowDown');
+      await sleep(350);
+      await pg.keyboard.press('Enter');
+      await sleep(400);
     } catch (_) {}
   }
 }
@@ -713,7 +773,7 @@ app.get('/progreso', async (_req, res) => {
       liveShotTs = Date.now();
     } catch(_) {}
   }
-  res.json({ ...progreso, screenshot: progreso.activo ? liveShot : null });
+  res.json({ ...progreso, screenshot: progreso.activo ? liveShot : null, colaOcupada, colaEsperando });
 });
 
 // Estado
@@ -727,6 +787,29 @@ app.get('/estado', (_req, res) => {
   });
 });
 
+// ── Cola de validaciones (una a la vez) ──────────────────────────
+let colaOcupada   = false;
+let colaEsperando = 0;    // cuántos trabajadores están esperando turno
+
+async function ejecutarConCola(datos) {
+  // Si hay una validación en curso, esperar hasta que termine (máx 5 min)
+  const MAX_ESPERA = 300_000;
+  const INTERVALO  = 2_000;
+  let esperado = 0;
+  while (colaOcupada) {
+    if (esperado >= MAX_ESPERA) throw new Error('Tiempo de espera agotado — intenta de nuevo');
+    await sleep(INTERVALO);
+    esperado += INTERVALO;
+  }
+  colaOcupada = true;
+  try {
+    return await ejecutarValidacion(datos);
+  } finally {
+    colaOcupada = false;
+    colaEsperando = Math.max(0, colaEsperando - 1);
+  }
+}
+
 // Validar cobertura
 app.post('/validar', async (req, res) => {
   const { dni, tipo, direccion, distrito, hhuu, via, numero, operador, operadorNombre } = req.body;
@@ -736,31 +819,39 @@ app.post('/validar', async (req, res) => {
   if (tipo === 'calle' && (!distrito || !via || !numero)) return res.status(400).json({ ok: false, error: 'Faltan campos: distrito, via, numero' });
   if (!WIN.creds.usuario) return res.status(500).json({ ok: false, error: 'Credenciales WIN no configuradas' });
 
+  // Informar cuántos están esperando
+  if (colaOcupada) colaEsperando++;
+  const posicion = colaEsperando;
+
   console.log(`\n${'═'.repeat(50)}`);
-  console.log(`▶ Validando — DNI: ${dni} | Tipo: ${tipo}`);
+  console.log(`▶ Validando — DNI: ${dni} | Tipo: ${tipo} | Operador: ${operadorNombre||operador}`);
   if (tipo === 'calle') console.log(`  ${distrito} / ${hhuu||'-'} / ${via} ${numero}`);
   else console.log(`  Coords: ${direccion}`);
+  if (posicion > 0) console.log(`  ⏳ En cola — posición #${posicion}`);
   console.log(`${'═'.repeat(50)}`);
 
+  const datos = { dni, tipo, direccion, distrito, hhuu, via, numero, operador, operadorNombre };
+
   try {
-    const resultado = await ejecutarValidacion({ dni, tipo, direccion, distrito, hhuu, via, numero, operador, operadorNombre });
+    const resultado = await ejecutarConCola(datos);
     console.log('✓ Resultado:', resultado.resultado);
     res.json({ ...resultado, dni, tipo });
   } catch(e) {
     console.error('✗ Error:', e.message);
-    // Si el error fue de sesión expirada, reintentar una vez automáticamente
     if (e.message.toLowerCase().includes('login') || e.message.toLowerCase().includes('sesi')) {
       console.log('🔄 Reintentando tras re-login...');
       loggedIn = false;
       try {
-        const resultado = await ejecutarValidacion({ dni, tipo, direccion, distrito, hhuu, via, numero, operador, operadorNombre });
+        const resultado = await ejecutarConCola(datos);
         console.log('✓ Reintento exitoso:', resultado.resultado);
         return res.json({ ...resultado, dni, tipo });
       } catch(e2) {
+        colaOcupada = false;
         console.error('✗ Reintento fallido:', e2.message);
         return res.status(500).json({ ok: false, error: e2.message });
       }
     }
+    colaOcupada = false;
     res.status(500).json({ ok: false, error: e.message });
   }
 });
