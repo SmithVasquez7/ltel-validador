@@ -603,7 +603,10 @@ function setTipo(t){
   // Campos coords
   document.getElementById('field-lat').style.display=t==='coords'?'flex':'none';
   document.getElementById('field-lng').style.display=t==='coords'?'flex':'none';
+  // Distrito: visible siempre en calle, oculto en coords
+  document.getElementById('field-distrito').style.display=t==='calle'?'flex':'none';
   // Required
+  document.getElementById('distrito').required=t==='calle';
   document.getElementById('via').required=t==='calle';
   document.getElementById('numero').required=t==='calle';
   document.getElementById('latitud').required=t==='coords';
@@ -769,6 +772,9 @@ document.getElementById('validForm').addEventListener('submit',async(e)=>{
         distrito, hhuu, via, numero,
         // coords
         direccion: tipoActual==='coords' ? `${latitud},${longitud}` : '',
+        // trabajador
+        operador:       session.usuario,
+        operadorNombre: session.nombre || session.usuario,
       }),
       signal:AbortSignal.timeout(180000), // 180s — cold start Render + automatización WIN
     });

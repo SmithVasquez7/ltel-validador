@@ -481,6 +481,8 @@ async function ejecutarValidacion(datos) {
         distrito:  datos.distrito || '', hhuu: datos.hhuu||'', via: datos.via||'', numero: datos.numero||'',
         resultado: 'sin_cobertura', detalleResultado: 'La dirección NO tiene cobertura WIN',
         scoreNum: -1, aprobado: false, tieneCobertura: false,
+        operador:       datos.operador       || '',
+        operadorNombre: datos.operadorNombre || '',
         fechaISO: new Date().toISOString(),
       });
     } catch(e) { console.error(`  ❌ Firestore NO guardó (sin_cobertura): ${e.message}`); }
@@ -606,6 +608,8 @@ async function ejecutarValidacion(datos) {
       scoreNum:         scoreNum        !== null ? scoreNum : -1,
       aprobado,
       tieneCobertura:   true,
+      operador:         datos.operador       || '',
+      operadorNombre:   datos.operadorNombre || '',
       fechaISO:         new Date().toISOString(),
     });
   } catch(fsErr) {
@@ -683,7 +687,7 @@ app.get('/estado', (_req, res) => {
 
 // Validar cobertura
 app.post('/validar', async (req, res) => {
-  const { dni, tipo, direccion, distrito, hhuu, via, numero } = req.body;
+  const { dni, tipo, direccion, distrito, hhuu, via, numero, operador, operadorNombre } = req.body;
 
   if (!tipo) return res.status(400).json({ ok: false, error: 'Falta campo: tipo' });
   if (tipo === 'coords' && !direccion) return res.status(400).json({ ok: false, error: 'Falta coordenadas' });
@@ -697,7 +701,7 @@ app.post('/validar', async (req, res) => {
   console.log(`${'═'.repeat(50)}`);
 
   try {
-    const resultado = await ejecutarValidacion({ dni, tipo, direccion, distrito, hhuu, via, numero });
+    const resultado = await ejecutarValidacion({ dni, tipo, direccion, distrito, hhuu, via, numero, operador, operadorNombre });
     console.log('✓ Resultado:', resultado.resultado);
     res.json({ ...resultado, dni, tipo });
   } catch(e) {
@@ -707,7 +711,7 @@ app.post('/validar', async (req, res) => {
       console.log('🔄 Reintentando tras re-login...');
       loggedIn = false;
       try {
-        const resultado = await ejecutarValidacion({ dni, tipo, direccion, distrito, hhuu, via, numero });
+        const resultado = await ejecutarValidacion({ dni, tipo, direccion, distrito, hhuu, via, numero, operador, operadorNombre });
         console.log('✓ Reintento exitoso:', resultado.resultado);
         return res.json({ ...resultado, dni, tipo });
       } catch(e2) {
