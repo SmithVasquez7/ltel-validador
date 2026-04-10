@@ -202,6 +202,25 @@ tr:hover td{background:rgba(255,255,255,.02)}
 @keyframes spin-lento{ 0%{transform:rotate(0deg)} 100%{transform:rotate(360deg)} }
 </style>
 
+<!-- MODAL CONFIGURAR URL SERVIDOR -->
+<div id="modal-server-url" style="display:none;position:fixed;inset:0;z-index:200;background:rgba(0,0,0,.7);backdrop-filter:blur(8px);align-items:center;justify-content:center;padding:1rem">
+  <div style="background:#0f1e35;border:1px solid rgba(255,255,255,.1);border-radius:16px;padding:2rem;width:100%;max-width:460px;box-shadow:0 30px 60px rgba(0,0,0,.5)">
+    <div style="margin-bottom:1.25rem">
+      <div style="font-size:1rem;font-weight:700;color:#fff"><i class="fas fa-server" style="color:var(--primary-light);margin-right:.5rem"></i>URL del Servidor de Automatización</div>
+      <div style="font-size:.78rem;color:var(--text-secondary);margin-top:.35rem">Ingresa la URL pública del servidor Node.js que corre en la PC del administrador (ej: ngrok, IP pública, etc.)</div>
+    </div>
+    <div style="margin-bottom:1rem">
+      <label style="font-size:.78rem;font-weight:600;color:rgba(255,255,255,.6);display:block;margin-bottom:.4rem">URL del Servidor</label>
+      <input type="text" id="input-server-url" placeholder="https://xxxx.ngrok-free.app  ó  http://192.168.1.5:3000" style="width:100%;padding:.8rem 1rem;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);border-radius:10px;color:#fff;font-family:'Inter',sans-serif;font-size:.85rem;outline:none">
+      <div style="font-size:.72rem;color:var(--text-muted);margin-top:.4rem"><i class="fas fa-info-circle" style="color:var(--primary-light)"></i> Sin barra al final. El admin debe exponer el servidor con <strong>ngrok</strong> u otra herramienta.</div>
+    </div>
+    <div style="display:flex;gap:.75rem">
+      <button onclick="guardarServerURL()" style="flex:1;padding:.8rem;background:linear-gradient(135deg,var(--primary),var(--primary-dark));border:none;border-radius:10px;color:#fff;font-family:'Inter',sans-serif;font-size:.88rem;font-weight:600;cursor:pointer"><i class="fas fa-save"></i> Guardar y Conectar</button>
+      <button onclick="document.getElementById('modal-server-url').style.display='none'" style="padding:.8rem 1.2rem;background:rgba(255,255,255,.06);border:1px solid var(--border);border-radius:10px;color:var(--text-secondary);cursor:pointer;font-family:'Inter',sans-serif">Cancelar</button>
+    </div>
+  </div>
+</div>
+
 <!-- MODAL CREDENCIALES WIN -->
 <div id="modal-creds" style="display:none;position:fixed;inset:0;z-index:200;background:rgba(0,0,0,.7);backdrop-filter:blur(8px);align-items:center;justify-content:center;padding:1rem">
   <div style="background:#0f1e35;border:1px solid rgba(255,255,255,.1);border-radius:16px;padding:2rem;width:100%;max-width:420px;box-shadow:0 30px 60px rgba(0,0,0,.5)">
@@ -320,6 +339,9 @@ tr:hover td{background:rgba(255,255,255,.02)}
     <div class="topbar-title"><i class="fas fa-search-location" style="color:var(--primary-light);margin-right:.5rem"></i>Validar Cobertura</div>
     <div class="topbar-right">
       <div class="status-badge" id="server-badge"><div class="status-dot"></div> Verificando...</div>
+      <button id="btn-server-url" onclick="abrirModalServerURL()" style="background:rgba(99,102,241,.12);border:1px solid rgba(99,102,241,.3);border-radius:8px;color:#a5b4fc;font-size:.78rem;padding:.4rem .85rem;cursor:pointer;font-family:'Inter',sans-serif;transition:all .2s" title="Configurar URL del servidor">
+        <i class="fas fa-server"></i> <span id="lbl-server-url">Servidor URL</span>
+      </button>
       <button onclick="document.getElementById('modal-creds').style.display='flex'" style="background:rgba(255,255,255,.06);border:1px solid var(--border);border-radius:8px;color:var(--text-secondary);font-size:.78rem;padding:.4rem .85rem;cursor:pointer;font-family:'Inter',sans-serif;transition:all .2s" onmouseover="this.style.color='#fff'" onmouseout="this.style.color='var(--text-secondary)'">
         <i class="fas fa-key"></i> Credenciales WIN
       </button>
@@ -384,10 +406,19 @@ tr:hover td{background:rgba(255,255,255,.02)}
         <div style="background:rgba(255,255,255,.07);border-radius:50px;height:8px;overflow:hidden">
           <div id="progreso-bar" style="height:100%;background:linear-gradient(90deg,var(--primary),var(--accent));border-radius:50px;width:0%;transition:width .6s ease"></div>
         </div>
-        <div style="display:flex;justify-content:space-between;margin-top:.35rem">
+        <div style="display:flex;justify-content:space-between;margin-top:.35rem;margin-bottom:.85rem">
           <span style="font-size:.68rem;color:var(--text-muted)">0%</span>
           <span id="progreso-pct" style="font-size:.68rem;color:var(--primary-light);font-weight:600">0%</span>
           <span style="font-size:.68rem;color:var(--text-muted)">100%</span>
+        </div>
+
+        <!-- Vista en vivo del navegador automatizado -->
+        <div id="liveview-wrap" style="display:none;border:1px solid rgba(99,102,241,.3);border-radius:10px;overflow:hidden;background:#000">
+          <div style="padding:.4rem .85rem;background:rgba(99,102,241,.15);display:flex;align-items:center;gap:.5rem;font-size:.72rem;color:#a5b4fc;font-weight:600">
+            <span style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;animation:pulse 1.5s ease-in-out infinite"></span>
+            Vista en vivo — Navegador automatizado
+          </div>
+          <img id="liveview-img" src="" alt="Vista en vivo" style="width:100%;display:block;max-height:420px;object-fit:contain">
         </div>
 
       </div>
@@ -579,9 +610,15 @@ function setTipo(t){
   document.getElementById('longitud').required=t==='coords';
 }
 
-const SERVER= window.location.hostname==='localhost'||window.location.hostname==='127.0.0.1'
-  ? 'http://localhost:3000'
-  : 'https://ltel-validador-win.onrender.com';
+// URL del servidor: configurable desde el panel (guardada en localStorage)
+// En local usa localhost, en Hostinger usa la URL que configure el admin
+function getServerURL() {
+  if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+    return 'http://localhost:3000';
+  }
+  return localStorage.getItem('ltel_server_url') || '';
+}
+let SERVER = getServerURL();
 
 // ── Verificar servidor al cargar ──
 async function checkServidor(){
@@ -609,6 +646,38 @@ async function checkServidor(){
 function mostrarAlertaCreds(){
   document.getElementById('alert-creds').style.display='flex';
 }
+
+// ── URL Servidor ──
+function abrirModalServerURL(){
+  const actual = localStorage.getItem('ltel_server_url') || '';
+  document.getElementById('input-server-url').value = actual;
+  document.getElementById('modal-server-url').style.display = 'flex';
+}
+function guardarServerURL(){
+  let url = document.getElementById('input-server-url').value.trim().replace(/\/$/, '');
+  if(!url){ alert('Ingresa una URL válida'); return; }
+  localStorage.setItem('ltel_server_url', url);
+  SERVER = url;
+  document.getElementById('modal-server-url').style.display = 'none';
+  document.getElementById('lbl-server-url').textContent = url.replace(/^https?:\/\//, '').slice(0, 20) + '…';
+  checkServidor();
+}
+// Mostrar URL configurada en el botón al cargar
+(function(){
+  const saved = localStorage.getItem('ltel_server_url');
+  const isLocal = window.location.hostname==='localhost'||window.location.hostname==='127.0.0.1';
+  if(isLocal){
+    document.getElementById('btn-server-url').style.display = 'none'; // no necesario en local
+  } else if(saved){
+    document.getElementById('lbl-server-url').textContent = saved.replace(/^https?:\/\//, '').slice(0, 20) + '…';
+  } else {
+    // Sin URL configurada — mostrar alerta
+    document.getElementById('btn-server-url').style.background = 'rgba(239,68,68,.15)';
+    document.getElementById('btn-server-url').style.borderColor = 'rgba(239,68,68,.4)';
+    document.getElementById('btn-server-url').style.color = '#fca5a5';
+    document.getElementById('lbl-server-url').textContent = '⚠ Configurar URL';
+  }
+})();
 
 // ── Validar form ──
 document.getElementById('validForm').addEventListener('submit',async(e)=>{
@@ -678,6 +747,13 @@ document.getElementById('validForm').addEventListener('submit',async(e)=>{
         document.getElementById('banner-icono').textContent = icono;
         document.getElementById('banner-num').textContent  = `${p.num} / ${p.total}`;
         document.getElementById('banner-pct').textContent  = pct + '%';
+        // Vista en vivo
+        if(p.screenshot){
+          const lv = document.getElementById('liveview-wrap');
+          const img = document.getElementById('liveview-img');
+          lv.style.display = 'block';
+          img.src = 'data:image/jpeg;base64,' + p.screenshot;
+        }
       }
     }catch(_){}
   }, 1000);
@@ -775,11 +851,11 @@ document.getElementById('validForm').addEventListener('submit',async(e)=>{
   }
 
   clearInterval(progresoInterval);
-  document.getElementById('progreso-wrap').style.display = 'none';
+  document.getElementById('progreso-wrap').style.display  = 'none';
+  document.getElementById('liveview-wrap').style.display  = 'none';
   document.getElementById('banner-progreso').style.display = 'none';
   btn.disabled=false; btn.classList.remove('loading');
-  // Delay para que Firestore propague el update antes de recargar
-  setTimeout(()=>{ loadHistorial(); loadStats(); }, 2000);
+  setTimeout(()=>{ loadHistorial(); loadStats(); }, 3000);
 });
 
 // ── Guardar credenciales WIN ──
@@ -830,7 +906,7 @@ function resetForm(){
 async function loadHistorial(){
   try{
     const snap=await db.collection('validaciones')
-      .orderBy('fecha','desc').limit(8).get();
+      .orderBy('fechaISO','desc').limit(8).get({ source: 'server' });
     console.log('📋 Historial: docs encontrados =', snap.size);
     const tbody=document.getElementById('historial-body');
     if(snap.empty){tbody.innerHTML='<tr><td colspan="6"><div class="empty-state"><i class="fas fa-inbox"></i>Sin validaciones aún</div></td></tr>';return;}
@@ -866,7 +942,7 @@ async function loadStats(){
   try{
     const hoy=new Date();hoy.setHours(0,0,0,0);
     const snap=await db.collection('validaciones')
-      .where('fechaISO','>=',hoy.toISOString()).get();
+      .where('fechaISO','>=',hoy.toISOString()).get({ source: 'server' });
     let total=0,ok=0,fail=0;
     snap.forEach(doc=>{
       total++;

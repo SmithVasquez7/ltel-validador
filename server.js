@@ -106,6 +106,10 @@ function resetProgreso() {
   progreso = { num: 0, total: 12, paso: 'En espera', icono: '⏳', activo: false };
 }
 
+// Captura en vivo — se actualiza cada vez que el dashboard la pide (máx cada 2s)
+let liveShot = null;
+let liveShotTs = 0;
+
 // Carpeta screenshots
 const SHOTS_DIR = path.join(__dirname, 'screenshots');
 if (!fs.existsSync(SHOTS_DIR)) fs.mkdirSync(SHOTS_DIR);
@@ -584,9 +588,16 @@ app.get('/debug', async (_req, res) => {
   }
 });
 
-// Progreso actual de la automatización
-app.get('/progreso', (_req, res) => {
-  res.json(progreso);
+// Progreso actual + captura en vivo del navegador
+app.get('/progreso', async (_req, res) => {
+  // Tomar captura solo si hay automatización activa y han pasado ≥2s desde la última
+  if (progreso.activo && page && !page.isClosed() && (Date.now() - liveShotTs) > 2000) {
+    try {
+      liveShot = await page.screenshot({ encoding: 'base64', type: 'jpeg', quality: 55 });
+      liveShotTs = Date.now();
+    } catch(_) {}
+  }
+  res.json({ ...progreso, screenshot: progreso.activo ? liveShot : null });
 });
 
 // Estado
