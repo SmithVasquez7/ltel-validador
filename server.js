@@ -53,7 +53,8 @@ const WIN = {
     input_lon:  '#gf_lon',
 
     // ── Botón Buscar mapa ──
-    btn_buscar: '#gf_buscar_coordenadas',
+    btn_buscar:       '#gf_buscar',             // búsqueda por dirección
+    btn_buscar_coord: '#gf_buscar_coordenadas', // búsqueda por coordenadas GPS
 
     // ── Popup del mapa ──
     popup_confirmar: '.leaflet-popup-content .gf_btnPopup',
@@ -416,9 +417,10 @@ async function ejecutarValidacion(datos) {
   // ── PASO 5: Clic en Buscar ─────────────────────────────────────
   setProgreso(6, 'Buscando ubicación en mapa...', '🗺️');
   console.log('📌 Paso 5: Buscando en mapa...');
-  await pg.waitForSelector(WIN.sel.btn_buscar, { timeout: 8000 });
+  const selBuscar = datos.tipo === 'coords' ? WIN.sel.btn_buscar_coord : WIN.sel.btn_buscar;
+  await pg.waitForSelector(selBuscar, { timeout: 8000 });
   await sleep(500);
-  await pg.click(WIN.sel.btn_buscar);
+  await pg.click(selBuscar);
   await sleep(2500); // esperar que el mapa procese y genere el popup
   await shot(pg, '07_after_buscar');
 
