@@ -666,7 +666,7 @@ async function cargarServerURL() {
 async function checkServidor(){
   if (!SERVER) return;
   try{
-    const r=await fetch(`${SERVER}/estado`,{signal:AbortSignal.timeout(4000)});
+    const r=await fetch(`${SERVER}/estado`,{signal:AbortSignal.timeout(4000),headers:{'ngrok-skip-browser-warning':'1'}});
     const d=await r.json();
     const badge=document.getElementById('server-badge');
     if(d.ok){
@@ -765,7 +765,7 @@ document.getElementById('validForm').addEventListener('submit',async(e)=>{
   // Iniciar polling de progreso (cada 1s)
   const progresoInterval = setInterval(async()=>{
     try{
-      const r = await fetch(`${SERVER}/progreso`);
+      const r = await fetch(`${SERVER}/progreso`,{headers:{'ngrok-skip-browser-warning':'1'}});
       const p = await r.json();
 
       // ── Gestión del banner de cola ──────────────────────────────
@@ -818,7 +818,7 @@ document.getElementById('validForm').addEventListener('submit',async(e)=>{
   try{
     const resp=await fetch(`${SERVER}/validar`,{
       method:'POST',
-      headers:{'Content-Type':'application/json'},
+      headers:{'Content-Type':'application/json','ngrok-skip-browser-warning':'1'},
       body:JSON.stringify({
         dni, tipo:tipoActual,
         // calle
@@ -914,7 +914,7 @@ async function guardarCredsWIN(){
   if(!u||!p){alert('Completa usuario y contraseña WIN');return;}
   try{
     const r=await fetch(`${SERVER}/configurar`,{
-      method:'POST',headers:{'Content-Type':'application/json'},
+      method:'POST',headers:{'Content-Type':'application/json','ngrok-skip-browser-warning':'1'},
       body:JSON.stringify({usuario:u,password:p}),
       signal:AbortSignal.timeout(5000),
     });

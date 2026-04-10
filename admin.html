@@ -718,7 +718,8 @@ async function guardarCredsWIN(){
 
   try{
     const resp=await fetch(`${SERVER}/configurar`,{
-      method:'POST',headers:{'Content-Type':'application/json'},
+      method:'POST',
+      headers:{'Content-Type':'application/json','ngrok-skip-browser-warning':'1'},
       body:JSON.stringify({usuario:u,password:p}),
       signal:AbortSignal.timeout(10000),
     });
@@ -771,7 +772,7 @@ async function checkServer(){
   document.getElementById('srv-url').textContent=SERVER;
 
   try{
-    const resp=await fetch(`${SERVER}/estado`,{signal:AbortSignal.timeout(8000)});
+    const resp=await fetch(`${SERVER}/estado`,{signal:AbortSignal.timeout(8000),headers:{'ngrok-skip-browser-warning':'1'}});
     const data=await resp.json();
     el.className='server-status online';
     txt.textContent='En línea';
