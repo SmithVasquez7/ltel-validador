@@ -790,7 +790,7 @@ document.getElementById('validForm').addEventListener('submit',async(e)=>{
         detalle:data.detalle||'' });
 
       // ── 2. Guardar en Firestore (best-effort, en paralelo) ──
-      db.collection('validaciones').add({
+      db.collection('validacionesWIN').add({
         dni, direccion:direccionResumen, tipo:tipoActual,
         distrito, hhuu, via, numero, observaciones:obs,
         operador:session.usuario, operadorNombre:session.nombre||session.usuario,
@@ -894,7 +894,7 @@ function resetForm(){
 // ── Historial reciente ──
 async function loadHistorial(){
   try{
-    const snap=await db.collection('validaciones')
+    const snap=await db.collection('validacionesWIN')
       .orderBy('fechaISO','desc').limit(8).get({ source: 'server' });
     console.log('📋 Historial: docs encontrados =', snap.size);
     const tbody=document.getElementById('historial-body');
@@ -930,7 +930,7 @@ async function loadHistorial(){
 async function loadStats(){
   try{
     const hoy=new Date();hoy.setHours(0,0,0,0);
-    const snap=await db.collection('validaciones')
+    const snap=await db.collection('validacionesWIN')
       .where('fechaISO','>=',hoy.toISOString()).get({ source: 'server' });
     let total=0,ok=0,fail=0;
     snap.forEach(doc=>{

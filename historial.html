@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<link rel="icon" type="image/x-icon" href="../assets/icons/SOFTKES.ico">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>L-TEL | Historial de Validaciones</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+<style>
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --primary:#0ea5e9;--primary-dark:#0284c7;--primary-light:#38bdf8;
+  --accent:#06b6d4;--sidebar-w:260px;
+  --dark:#0a1628;--bg-card:rgba(255,255,255,0.04);
+  --text:#fff;--text-secondary:#94a3b8;--text-muted:#475569;
+  --border:rgba(255,255,255,0.07);--radius:10px;--radius-lg:14px;
+  --success:#22c55e;--danger:#ef4444;--warning:#f59e0b;
+}
+html{scroll-behavior:smooth}
+body{font-family:'Inter',sans-serif;background:var(--dark);color:var(--text);min-height:100vh;display:flex;-webkit-font-smoothing:antialiased}
+::-webkit-scrollbar{width:5px}
+::-webkit-scrollbar-thumb{background:rgba(14,165,233,.25);border-radius:10px}
+.sidebar{width:var(--sidebar-w);min-height:100vh;background:rgba(10,22,40,0.97);border-right:1px solid var(--border);display:flex;flex-direction:column;position:fixed;top:0;left:0;z-index:100}
+.sidebar-header{padding:1.5rem 1.25rem 1rem;border-bottom:1px solid var(--border)}
+.sidebar-logo{display:flex;align-items:center;gap:.85rem}
+.sidebar-logo-img{width:42px;height:42px;border-radius:10px;overflow:hidden;background:#fff;border:1px solid rgba(14,165,233,.2);flex-shrink:0}
+.sidebar-logo-img img{width:100%;height:100%;object-fit:contain;padding:4px}
+.sidebar-logo-text strong{font-size:.95rem;font-weight:700;color:#fff;display:block}
+.sidebar-logo-text span{font-size:.68rem;color:var(--text-secondary)}
+.sidebar-nav{flex:1;padding:1rem 0;overflow-y:auto}
+.nav-section{padding:.5rem 1.25rem .25rem;font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--text-muted)}
+.nav-link{display:flex;align-items:center;gap:.75rem;padding:.65rem 1.25rem;font-size:.85rem;font-weight:500;color:var(--text-secondary);text-decoration:none;transition:all .18s;border-left:3px solid transparent;cursor:pointer}
+.nav-link:hover{color:#fff;background:rgba(255,255,255,.04)}
+.nav-link.active{color:var(--primary-light);background:rgba(14,165,233,.08);border-left-color:var(--primary)}
+.nav-link i{width:18px;text-align:center;font-size:.9rem}
+.sidebar-footer{padding:1rem 1.25rem;border-top:1px solid var(--border)}
+.user-info{display:flex;align-items:center;gap:.75rem;margin-bottom:.85rem}
+.user-avatar{width:36px;height:36px;background:linear-gradient(135deg,var(--primary),var(--accent));border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:.85rem;flex-shrink:0}
+.user-name{font-size:.85rem;font-weight:600}
+.user-role{font-size:.7rem;color:var(--text-secondary);margin-top:.1rem}
+.btn-logout{width:100%;padding:.55rem;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.2);border-radius:var(--radius);color:#fca5a5;font-size:.8rem;font-weight:500;cursor:pointer;transition:all .2s;display:flex;align-items:center;justify-content:center;gap:.5rem;font-family:'Inter',sans-serif}
+.main{margin-left:var(--sidebar-w);flex:1;display:flex;flex-direction:column}
+.topbar{height:64px;background:rgba(10,22,40,.9);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:0 2rem;position:sticky;top:0;z-index:50}
+.topbar-title{font-size:1.05rem;font-weight:700}
+.content{flex:1;padding:2rem;max-width:1200px;width:100%}
+.card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;margin-bottom:1.5rem}
+.card-header{display:flex;align-items:center;justify-content:space-between;padding:1.1rem 1.5rem;border-bottom:1px solid var(--border);flex-wrap:wrap;gap:.75rem}
+.card-title{font-size:.92rem;font-weight:700}
+table{width:100%;border-collapse:collapse}
+thead tr{background:rgba(255,255,255,.03)}
+th{padding:.7rem 1rem;font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text-muted);text-align:left;white-space:nowrap}
+td{padding:.8rem 1rem;font-size:.82rem;color:var(--text-secondary);border-top:1px solid var(--border);vertical-align:middle}
+tr:hover td{background:rgba(255,255,255,.02)}
+.badge{display:inline-flex;align-items:center;gap:.3rem;padding:.2rem .65rem;border-radius:50px;font-size:.7rem;font-weight:600}
+.badge-success{background:rgba(34,197,94,.12);color:#86efac;border:1px solid rgba(34,197,94,.2)}
+.badge-error{background:rgba(239,68,68,.12);color:#fca5a5;border:1px solid rgba(239,68,68,.2)}
+.badge-pending{background:rgba(245,158,11,.12);color:#fcd34d;border:1px solid rgba(245,158,11,.2)}
+.badge-blue{background:rgba(14,165,233,.12);color:#7dd3fc;border:1px solid rgba(14,165,233,.2)}
+.empty-state{text-align:center;padding:3rem;color:var(--text-muted)}
+.empty-state i{font-size:2rem;display:block;margin-bottom:.75rem}
+.stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;margin-bottom:1.5rem}
+.stat-card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-lg);padding:1.1rem 1.25rem;display:flex;align-items:center;gap:.85rem}
+.stat-icon{width:40px;height:40px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:1rem;flex-shrink:0}
+.stat-val{font-size:1.5rem;font-weight:800;line-height:1}
+.stat-label{font-size:.72rem;color:var(--text-secondary)}
+.filter-bar{display:flex;gap:.65rem;flex-wrap:wrap;align-items:center;padding:1rem 1.5rem;border-bottom:1px solid var(--border);background:rgba(255,255,255,.02)}
+.filter-input{padding:.5rem .9rem;background:rgba(255,255,255,.05);border:1px solid var(--border);border-radius:8px;color:#fff;font-family:'Inter',sans-serif;font-size:.82rem;outline:none}
+.filter-input:focus{border-color:var(--primary)}
+.filter-select{appearance:none;padding-right:1.8rem;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 12 12'%3E%3Cpath fill='%2394a3b8' d='M6 8L1 3h10z'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 8px center;cursor:pointer}
+.btn{padding:.55rem 1.1rem;border-radius:var(--radius);font-family:'Inter',sans-serif;font-size:.82rem;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:.4rem;border:none;transition:all .2s}
+.btn-primary{background:linear-gradient(135deg,var(--primary),var(--primary-dark));color:#fff}
+.btn-ghost{background:rgba(255,255,255,.06);color:var(--text-secondary);border:1px solid var(--border)}
+.btn-ghost:hover{color:#fff;background:rgba(255,255,255,.1)}
+/* Tabla trabajadores */
+.worker-row{display:flex;align-items:center;gap:.65rem}
+.worker-avatar{width:30px;height:30px;border-radius:50%;background:linear-gradient(135deg,var(--primary),var(--accent));display:flex;align-items:center;justify-content:center;font-weight:700;font-size:.75rem;flex-shrink:0}
+/* Modal detalle */
+.modal-overlay{display:none;position:fixed;inset:0;z-index:200;background:rgba(0,0,0,.75);backdrop-filter:blur(8px);align-items:center;justify-content:center;padding:1rem}
+.modal-box{background:#0f1e35;border:1px solid rgba(255,255,255,.1);border-radius:16px;padding:2rem;width:100%;max-width:520px;max-height:90vh;overflow-y:auto;box-shadow:0 30px 60px rgba(0,0,0,.6)}
+.detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:.65rem;margin-top:1.25rem}
+.detail-item{background:rgba(255,255,255,.04);border-radius:8px;padding:.75rem 1rem}
+.detail-label{font-size:.67rem;text-transform:uppercase;letter-spacing:.08em;color:var(--text-muted);margin-bottom:.3rem}
+.detail-val{font-size:.88rem;font-weight:600;color:#fff;word-break:break-word}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+@media(max-width:900px){.stats-grid{grid-template-columns:1fr 1fr}.sidebar{display:none}.main{margin-left:0}}
+</style>
+</head>
+<body>
+
+<!-- Modal detalle -->
+<div class="modal-overlay" id="modal-detalle" onclick="if(event.target===this)this.style.display='none'">
+  <div class="modal-box">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.5rem">
+      <div style="font-size:1rem;font-weight:700" id="det-titulo">Detalle</div>
+      <button onclick="document.getElementById('modal-detalle').style.display='none'" style="background:rgba(255,255,255,.06);border:1px solid var(--border);border-radius:8px;color:var(--text-secondary);width:30px;height:30px;cursor:pointer">✕</button>
+    </div>
+    <div id="det-fecha" style="font-size:.73rem;color:var(--text-secondary)"></div>
+    <div id="det-badge" style="margin:.85rem 0"></div>
+    <div class="detail-grid" id="det-grid"></div>
+  </div>
+</div>
+
+<aside class="sidebar">
+  <div class="sidebar-header">
+    <div class="sidebar-logo">
+      <div class="sidebar-logo-img"><img src="../assets/icons/ltel.jpeg" alt="L-TEL"></div>
+      <div class="sidebar-logo-text"><strong>L-TEL</strong><span>Validador de Cobertura</span></div>
+    </div>
+  </div>
+  <nav class="sidebar-nav">
+    <div class="nav-section">Principal</div>
+    <a class="nav-link" href="dashboard.html"><i class="fas fa-search-location"></i> Validar Cobertura</a>
+    <a class="nav-link active" href="historial.html"><i class="fas fa-history"></i> Historial</a>
+    <div class="nav-section" style="margin-top:.5rem">Sistema</div>
+    <a class="nav-link" href="usuarios.html"><i class="fas fa-users"></i> Usuarios</a>
+    <a class="nav-link" href="admin.html" id="link-admin" style="display:none"><i class="fas fa-crown" style="color:#c4b5fd"></i> <span style="color:#c4b5fd">Panel Admin</span></a>
+  </nav>
+  <div class="sidebar-footer">
+    <div class="user-info">
+      <div class="user-avatar" id="user-avatar">?</div>
+      <div><div class="user-name" id="user-name">Cargando...</div><div class="user-role" id="user-role">Operador</div></div>
+    </div>
+    <button class="btn-logout" onclick="logout()"><i class="fas fa-sign-out-alt"></i> Cerrar Sesión</button>
+  </div>
+</aside>
+
+<main class="main">
+  <div class="topbar">
+    <div class="topbar-title"><i class="fas fa-history" style="color:var(--primary-light);margin-right:.5rem"></i>Historial de Validaciones</div>
+    <button class="btn btn-ghost" onclick="cargarTodo()"><i class="fas fa-sync-alt"></i> Actualizar</button>
+  </div>
+
+  <div class="content">
+
+    <!-- Stats globales -->
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-icon" style="background:rgba(14,165,233,.15);color:var(--primary-light)"><i class="fas fa-check-circle"></i></div>
+        <div><div class="stat-label">Total validaciones</div><div class="stat-val" id="s-total">0</div></div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon" style="background:rgba(34,197,94,.12);color:#86efac"><i class="fas fa-thumbs-up"></i></div>
+        <div><div class="stat-label">Aprobados</div><div class="stat-val" id="s-aprobados">0</div></div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon" style="background:rgba(239,68,68,.12);color:#fca5a5"><i class="fas fa-times-circle"></i></div>
+        <div><div class="stat-label">Rechazados / Sin cob.</div><div class="stat-val" id="s-rechazados">0</div></div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon" style="background:rgba(245,158,11,.12);color:#fcd34d"><i class="fas fa-users"></i></div>
+        <div><div class="stat-label">Trabajadores activos</div><div class="stat-val" id="s-workers">0</div></div>
+      </div>
+    </div>
+
+    <!-- Resumen por trabajador (solo admin) -->
+    <div class="card" id="card-workers" style="display:none">
+      <div class="card-header">
+        <div class="card-title"><i class="fas fa-chart-bar" style="color:var(--primary-light);margin-right:.5rem"></i>Rendimiento por Trabajador</div>
+      </div>
+      <div style="overflow-x:auto">
+        <table>
+          <thead>
+            <tr><th>Trabajador</th><th>Total</th><th>Aprobados</th><th>Rechazados</th><th>Sin cobertura</th><th>% Aprobación</th></tr>
+          </thead>
+          <tbody id="tabla-workers"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Tabla historial -->
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title"><i class="fas fa-list" style="color:var(--primary-light);margin-right:.5rem"></i>Todas las Validaciones</div>
+        <div style="font-size:.78rem;color:var(--text-muted)" id="lbl-conteo">Cargando...</div>
+      </div>
+      <!-- Filtros -->
+      <div class="filter-bar">
+        <input type="text" id="f-dni" class="filter-input" placeholder="Buscar DNI..." oninput="aplicarFiltros()" style="width:130px">
+        <select id="f-resultado" class="filter-input filter-select" onchange="aplicarFiltros()">
+          <option value="">Todos los resultados</option>
+          <option value="aprobado">Aprobados</option>
+          <option value="rechazado">Rechazados</option>
+          <option value="sin_cobertura">Sin cobertura</option>
+          <option value="pendiente">Pendiente</option>
+        </select>
+        <select id="f-operador" class="filter-input filter-select" onchange="aplicarFiltros()" style="min-width:160px">
+          <option value="">Todos los operadores</option>
+        </select>
+        <input type="date" id="f-fecha-desde" class="filter-input" onchange="aplicarFiltros()">
+        <input type="date" id="f-fecha-hasta" class="filter-input" onchange="aplicarFiltros()">
+        <button class="btn btn-ghost" onclick="limpiarFiltros()"><i class="fas fa-times"></i> Limpiar</button>
+      </div>
+      <div style="overflow-x:auto">
+        <table>
+          <thead>
+            <tr><th>Fecha / Hora</th><th>DNI</th><th>Dirección</th><th>Tipo</th><th>Score</th><th>Resultado</th><th>Operador</th></tr>
+          </thead>
+          <tbody id="tabla-historial">
+            <tr><td colspan="7"><div class="empty-state"><i class="fas fa-spinner fa-spin"></i>Cargando...</div></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div style="padding:1rem 1.5rem;border-top:1px solid var(--border);display:flex;justify-content:center;gap:.5rem" id="paginacion"></div>
+    </div>
+
+  </div>
+</main>
+
+<script>
+const firebaseConfig={
+  apiKey:"AIzaSyDre3Wdt__AKKP2NGiv-I5ksqscoVPDsho",
+  authDomain:"softkes-ssi.firebaseapp.com",
+  projectId:"softkes-ssi",
+  storageBucket:"softkes-ssi.firebasestorage.app",
+  messagingSenderId:"949401432052",
+  appId:"1:949401432052:web:131984f96192cf9ff493a1"
+};
+if(!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+
+const _sess = sessionStorage.getItem('validadorUser');
+if(!_sess){ window.location.href='login.html'; }
+const session = JSON.parse(_sess);
+document.getElementById('user-name').textContent   = session.nombre||session.usuario;
+document.getElementById('user-role').textContent   = session.rol==='admin'?'Administrador':'Operador';
+document.getElementById('user-avatar').textContent = (session.nombre||session.usuario).charAt(0).toUpperCase();
+if(session.rol==='admin'){ document.getElementById('link-admin').style.display='flex'; document.getElementById('card-workers').style.display='block'; }
+function logout(){ sessionStorage.removeItem('validadorUser'); window.location.href='login.html'; }
+
+let todos = []; // todos los docs cargados
+let filtrados = [];
+const POR_PAGINA = 30;
+let pagina = 1;
+
+async function cargarTodo() {
+  document.getElementById('tabla-historial').innerHTML =
+    '<tr><td colspan="7"><div class="empty-state"><i class="fas fa-spinner fa-spin"></i>Cargando...</div></td></tr>';
+  try {
+    let query = db.collection('validacionesWIN').orderBy('fechaISO','desc');
+    // Operadores solo ven sus propias validaciones
+    if(session.rol !== 'admin') {
+      query = query.where('operador','==',session.usuario);
+    }
+    const snap = await query.limit(500).get({ source: 'server' });
+    todos = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    calcularStats();
+    poblarFiltroOperadores();
+    aplicarFiltros();
+  } catch(e) {
+    document.getElementById('tabla-historial').innerHTML =
+      `<tr><td colspan="7"><div class="empty-state"><i class="fas fa-exclamation-triangle"></i>Error: ${e.message}</div></td></tr>`;
+  }
+}
+
+function calcularStats() {
+  const aprobados  = todos.filter(d=>d.resultado==='aprobado').length;
+  const rechazados = todos.filter(d=>d.resultado==='rechazado'||d.resultado==='sin_cobertura').length;
+  const workers    = [...new Set(todos.map(d=>d.operador))].filter(Boolean).length;
+  document.getElementById('s-total').textContent     = todos.length;
+  document.getElementById('s-aprobados').textContent = aprobados;
+  document.getElementById('s-rechazados').textContent= rechazados;
+  document.getElementById('s-workers').textContent   = workers;
+
+  // Tabla por trabajador (solo admin)
+  if(session.rol === 'admin') {
+    const map = {};
+    todos.forEach(d => {
+      const op = d.operadorNombre||d.operador||'—';
+      if(!map[op]) map[op]={total:0,ap:0,rech:0,sincob:0};
+      map[op].total++;
+      if(d.resultado==='aprobado')     map[op].ap++;
+      if(d.resultado==='rechazado')    map[op].rech++;
+      if(d.resultado==='sin_cobertura')map[op].sincob++;
+    });
+    const tbody = document.getElementById('tabla-workers');
+    tbody.innerHTML = '';
+    Object.entries(map).sort((a,b)=>b[1].total-a[1].total).forEach(([nombre, s])=>{
+      const pct = s.total ? Math.round(s.ap/s.total*100) : 0;
+      const color = pct>=70?'#86efac':pct>=40?'#fcd34d':'#fca5a5';
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td><div class="worker-row"><div class="worker-avatar">${nombre.charAt(0).toUpperCase()}</div><span style="color:#fff;font-weight:600">${esc(nombre)}</span></div></td>
+        <td style="font-weight:700;color:#fff">${s.total}</td>
+        <td style="color:#86efac;font-weight:600">${s.ap}</td>
+        <td style="color:#fca5a5">${s.rech}</td>
+        <td style="color:#fcd34d">${s.sincob}</td>
+        <td><span style="font-weight:700;color:${color}">${pct}%</span></td>`;
+      tbody.appendChild(tr);
+    });
+  }
+}
+
+function poblarFiltroOperadores() {
+  const ops = [...new Set(todos.map(d=>d.operadorNombre||d.operador).filter(Boolean))].sort();
+  const sel = document.getElementById('f-operador');
+  sel.innerHTML = '<option value="">Todos los operadores</option>';
+  ops.forEach(op => { const o=document.createElement('option'); o.value=op; o.textContent=op; sel.appendChild(o); });
+}
+
+function aplicarFiltros() {
+  const dni      = document.getElementById('f-dni').value.trim().toLowerCase();
+  const resultado= document.getElementById('f-resultado').value;
+  const operador = document.getElementById('f-operador').value;
+  const desde    = document.getElementById('f-fecha-desde').value;
+  const hasta    = document.getElementById('f-fecha-hasta').value;
+
+  filtrados = todos.filter(d => {
+    if(dni    && !(d.dni||'').toLowerCase().includes(dni)) return false;
+    if(resultado && d.resultado !== resultado)             return false;
+    if(operador  && (d.operadorNombre||d.operador) !== operador) return false;
+    if(desde && d.fechaISO < desde) return false;
+    if(hasta && d.fechaISO > hasta+'T23:59:59') return false;
+    return true;
+  });
+
+  pagina = 1;
+  renderTabla();
+}
+
+function limpiarFiltros() {
+  ['f-dni','f-resultado','f-operador','f-fecha-desde','f-fecha-hasta'].forEach(id=>{
+    document.getElementById(id).value='';
+  });
+  aplicarFiltros();
+}
+
+function renderTabla() {
+  const inicio = (pagina-1)*POR_PAGINA;
+  const pageDocs = filtrados.slice(inicio, inicio+POR_PAGINA);
+  document.getElementById('lbl-conteo').textContent = `${filtrados.length} registro${filtrados.length!==1?'s':''}`;
+
+  const tbody = document.getElementById('tabla-historial');
+  if(!pageDocs.length){
+    tbody.innerHTML='<tr><td colspan="7"><div class="empty-state"><i class="fas fa-inbox"></i>Sin resultados</div></td></tr>';
+    renderPaginacion();
+    return;
+  }
+
+  const badgeMap = {
+    'aprobado':     '<span class="badge badge-success"><i class="fas fa-check-circle"></i> Aprobado</span>',
+    'rechazado':    '<span class="badge badge-error"><i class="fas fa-user-times"></i> Score bajo</span>',
+    'sin_cobertura':'<span class="badge badge-error"><i class="fas fa-times"></i> Sin cobertura</span>',
+    'pendiente':    '<span class="badge badge-pending"><i class="fas fa-clock"></i> Pendiente</span>',
+  };
+
+  tbody.innerHTML='';
+  pageDocs.forEach(d => {
+    const fecha = d.fechaISO ? new Date(d.fechaISO).toLocaleString('es-PE',{day:'2-digit',month:'2-digit',year:'2-digit',hour:'2-digit',minute:'2-digit'}) : '—';
+    const tr = document.createElement('tr');
+    tr.style.cursor='pointer';
+    tr.title='Clic para ver detalles';
+    tr.innerHTML=`
+      <td style="white-space:nowrap;color:var(--text-secondary)">${esc(fecha)}</td>
+      <td style="font-weight:700;color:#fff">${esc(d.dni||'—')}</td>
+      <td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(d.direccion||'')}">${esc(d.direccion||'—')}</td>
+      <td>${d.tipo==='coords'?'<i class="fas fa-crosshairs" style="color:var(--primary-light)"></i> GPS':'<i class="fas fa-road" style="color:var(--primary-light)"></i> Calle'}</td>
+      <td style="font-weight:700;color:var(--primary-light)">${d.scoreNum!=null?d.scoreNum:'—'}</td>
+      <td>${badgeMap[d.resultado]||badgeMap['pendiente']}</td>
+      <td>${esc(d.operadorNombre||d.operador||'—')}</td>`;
+    tr.addEventListener('click', ()=> verDetalle(d));
+    tbody.appendChild(tr);
+  });
+
+  renderPaginacion();
+}
+
+function renderPaginacion() {
+  const total = Math.ceil(filtrados.length / POR_PAGINA);
+  const cont  = document.getElementById('paginacion');
+  if(total <= 1){ cont.innerHTML=''; return; }
+  let html='';
+  for(let i=1;i<=total;i++){
+    html+=`<button onclick="irPagina(${i})" class="btn ${i===pagina?'btn-primary':'btn-ghost'}" style="min-width:36px;padding:.4rem .6rem">${i}</button>`;
+  }
+  cont.innerHTML=html;
+}
+function irPagina(n){ pagina=n; renderTabla(); window.scrollTo({top:0,behavior:'smooth'}); }
+
+function verDetalle(d) {
+  const badgeMap = {
+    'aprobado':     '<span class="badge badge-success" style="font-size:.82rem;padding:.3rem .9rem"><i class="fas fa-check-circle"></i> Aprobado</span>',
+    'rechazado':    '<span class="badge badge-error"   style="font-size:.82rem;padding:.3rem .9rem"><i class="fas fa-user-times"></i> Score bajo</span>',
+    'sin_cobertura':'<span class="badge badge-error"   style="font-size:.82rem;padding:.3rem .9rem"><i class="fas fa-times-circle"></i> Sin cobertura</span>',
+    'pendiente':    '<span class="badge badge-pending" style="font-size:.82rem;padding:.3rem .9rem"><i class="fas fa-clock"></i> Pendiente</span>',
+  };
+  document.getElementById('det-titulo').innerHTML =
+    `<i class="fas fa-id-card" style="color:var(--primary-light);margin-right:.5rem"></i>DNI: ${esc(d.dni||'—')}`;
+  document.getElementById('det-fecha').textContent =
+    d.fechaISO ? new Date(d.fechaISO).toLocaleString('es-PE',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}) : '—';
+  document.getElementById('det-badge').innerHTML = badgeMap[d.resultado]||badgeMap['pendiente'];
+
+  const campos = [
+    {l:'DNI',            v:d.dni||'—'},
+    {l:'Dirección',      v:d.direccion||'—', full:true},
+    {l:'Tipo',           v:d.tipo==='coords'?'Coordenadas GPS':'Calle / Av.'},
+    {l:'Cobertura WIN',  v:d.tieneCobertura?'✅ Tiene cobertura':'❌ Sin cobertura'},
+    {l:'Score cliente',  v:d.scoreNum!=null?String(d.scoreNum):'—'},
+    {l:'Calificación',   v:d.aprobado===true?'✅ Aprobado (≥301)':d.aprobado===false?'❌ Rechazado (<301)':'—'},
+    {l:'Detalle score',  v:d.detalleResultado||'—', full:true},
+    {l:'Operador',       v:d.operadorNombre||d.operador||'—'},
+  ];
+  if(d.tipo==='calle'){
+    if(d.distrito) campos.push({l:'Distrito/Prov/Dpto',v:d.distrito,full:true});
+    if(d.hhuu)     campos.push({l:'Urbanización',v:d.hhuu});
+    if(d.via)      campos.push({l:'Calle/Av.',v:d.via});
+    if(d.numero)   campos.push({l:'Número',v:d.numero});
+  }
+  if(d.observaciones) campos.push({l:'Observaciones',v:d.observaciones,full:true});
+
+  const grid = document.getElementById('det-grid');
+  grid.innerHTML='';
+  campos.forEach(c=>{
+    const div=document.createElement('div');
+    div.className='detail-item';
+    if(c.full) div.style.gridColumn='1/-1';
+    div.innerHTML=`<div class="detail-label">${esc(c.l)}</div><div class="detail-val">${esc(c.v)}</div>`;
+    grid.appendChild(div);
+  });
+  document.getElementById('modal-detalle').style.display='flex';
+}
+
+function esc(s){ return String(s||'').replace(/[<>&"']/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;',"'":'&#39;'}[c])); }
+
+cargarTodo();
+</script>
+</body>
+</html>
