@@ -70,6 +70,7 @@ tr:hover td{background:rgba(255,255,255,.02)}
 .filter-input{padding:.5rem .9rem;background:rgba(255,255,255,.05);border:1px solid var(--border);border-radius:8px;color:#fff;font-family:'Inter',sans-serif;font-size:.82rem;outline:none}
 .filter-input:focus{border-color:var(--primary)}
 .filter-select{appearance:none;padding-right:1.8rem;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 12 12'%3E%3Cpath fill='%2394a3b8' d='M6 8L1 3h10z'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 8px center;cursor:pointer}
+.filter-select option{background:#0f1e35;color:#fff}
 .btn{padding:.55rem 1.1rem;border-radius:var(--radius);font-family:'Inter',sans-serif;font-size:.82rem;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:.4rem;border:none;transition:all .2s}
 .btn-primary{background:linear-gradient(135deg,var(--primary),var(--primary-dark));color:#fff}
 .btn-ghost{background:rgba(255,255,255,.06);color:var(--text-secondary);border:1px solid var(--border)}
@@ -159,14 +160,48 @@ tr:hover td{background:rgba(255,255,255,.02)}
     <div class="card" id="card-workers" style="display:none">
       <div class="card-header">
         <div class="card-title"><i class="fas fa-chart-bar" style="color:var(--primary-light);margin-right:.5rem"></i>Rendimiento por Trabajador</div>
+        <div style="display:flex;align-items:center;gap:.75rem;flex-wrap:wrap">
+          <input type="text" id="f-buscar-worker" class="filter-input" placeholder="Buscar trabajador..." oninput="filtrarTablaWorkers()" style="width:170px;font-size:.78rem;padding:.35rem .75rem">
+          <div style="display:flex;align-items:center;gap:.4rem;font-size:.75rem;color:var(--text-muted)">
+            <span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#ef4444"></span>Menos de 5/día
+          </div>
+          <label style="font-size:.78rem;color:var(--text-muted);display:flex;align-items:center;gap:.4rem;cursor:pointer">
+            <input type="checkbox" id="chk-hoy" onchange="calcularStats()" style="accent-color:var(--primary)"> Solo hoy
+          </label>
+          <input type="date" id="f-fecha-diario" class="filter-input" onchange="calcularStats()" style="width:145px;font-size:.78rem;padding:.3rem .6rem">
+        </div>
       </div>
       <div style="overflow-x:auto">
         <table>
           <thead>
-            <tr><th>Trabajador</th><th>Total</th><th>Aprobados</th><th>Rechazados</th><th>Sin cobertura</th><th>% Aprobación</th></tr>
+            <tr>
+              <th>Trabajador</th>
+              <th>Total (período)</th>
+              <th>Aprobados</th>
+              <th>Rechazados</th>
+              <th>Sin cobertura</th>
+              <th>% Aprobación</th>
+              <th style="border-left:1px solid rgba(255,255,255,.1)">Días activo</th>
+              <th>Promedio/día</th>
+              <th id="th-dia-col" style="border-left:1px solid rgba(255,255,255,.1);display:none">Hoy / Fecha sel.</th>
+            </tr>
           </thead>
           <tbody id="tabla-workers"></tbody>
         </table>
+      </div>
+      <!-- Detalle diario expandible -->
+      <div id="detalle-diario-wrap" style="display:none;padding:1.25rem 1.5rem;border-top:1px solid var(--border)">
+        <div style="font-size:.82rem;font-weight:700;color:var(--primary-light);margin-bottom:.85rem">
+          <i class="fas fa-calendar-day"></i> Detalle diario — <span id="detalle-diario-nombre"></span>
+        </div>
+        <div style="overflow-x:auto">
+          <table>
+            <thead>
+              <tr><th>Fecha</th><th>Validaciones</th><th>Aprobados</th><th>Rechazados</th><th>Sin cobertura</th><th>Estado</th></tr>
+            </thead>
+            <tbody id="tabla-diario"></tbody>
+          </table>
+        </div>
       </div>
     </div>
 
@@ -264,33 +299,115 @@ function calcularStats() {
   document.getElementById('s-rechazados').textContent= rechazados;
   document.getElementById('s-workers').textContent   = workers;
 
-  // Tabla por trabajador (solo admin)
-  if(session.rol === 'admin') {
-    const map = {};
-    todos.forEach(d => {
-      const op = d.operadorNombre||d.operador||'—';
-      if(!map[op]) map[op]={total:0,ap:0,rech:0,sincob:0};
-      map[op].total++;
-      if(d.resultado==='aprobado')     map[op].ap++;
-      if(d.resultado==='rechazado')    map[op].rech++;
-      if(d.resultado==='sin_cobertura')map[op].sincob++;
-    });
-    const tbody = document.getElementById('tabla-workers');
-    tbody.innerHTML = '';
-    Object.entries(map).sort((a,b)=>b[1].total-a[1].total).forEach(([nombre, s])=>{
-      const pct = s.total ? Math.round(s.ap/s.total*100) : 0;
-      const color = pct>=70?'#86efac':pct>=40?'#fcd34d':'#fca5a5';
-      const tr = document.createElement('tr');
-      tr.innerHTML = `
-        <td><div class="worker-row"><div class="worker-avatar">${nombre.charAt(0).toUpperCase()}</div><span style="color:#fff;font-weight:600">${esc(nombre)}</span></div></td>
-        <td style="font-weight:700;color:#fff">${s.total}</td>
-        <td style="color:#86efac;font-weight:600">${s.ap}</td>
-        <td style="color:#fca5a5">${s.rech}</td>
-        <td style="color:#fcd34d">${s.sincob}</td>
-        <td><span style="font-weight:700;color:${color}">${pct}%</span></td>`;
-      tbody.appendChild(tr);
-    });
-  }
+  if(session.rol !== 'admin') return;
+
+  const solohoy   = document.getElementById('chk-hoy').checked;
+  const fechaSel  = document.getElementById('f-fecha-diario').value; // YYYY-MM-DD
+  const hoyStr    = new Date().toISOString().slice(0,10);
+  const diaFiltro = solohoy ? hoyStr : (fechaSel || null);
+
+  // Mostrar/ocultar columna de día específico
+  const thDia = document.getElementById('th-dia-col');
+  thDia.style.display = diaFiltro ? '' : 'none';
+  if(diaFiltro) thDia.textContent = diaFiltro === hoyStr ? 'Hoy' : diaFiltro;
+
+  // Agrupar por trabajador
+  const map = {}; // { nombre: { total, ap, rech, sincob, diasMap:{fecha:{total,ap,rech,sincob}} } }
+  todos.forEach(d => {
+    const op   = d.operadorNombre || d.operador || '—';
+    const fecha = (d.fechaISO||'').slice(0,10);
+    if(!map[op]) map[op] = { total:0, ap:0, rech:0, sincob:0, diasMap:{} };
+    map[op].total++;
+    if(d.resultado==='aprobado')      map[op].ap++;
+    if(d.resultado==='rechazado')     map[op].rech++;
+    if(d.resultado==='sin_cobertura') map[op].sincob++;
+    if(fecha){
+      if(!map[op].diasMap[fecha]) map[op].diasMap[fecha]={total:0,ap:0,rech:0,sincob:0};
+      map[op].diasMap[fecha].total++;
+      if(d.resultado==='aprobado')      map[op].diasMap[fecha].ap++;
+      if(d.resultado==='rechazado')     map[op].diasMap[fecha].rech++;
+      if(d.resultado==='sin_cobertura') map[op].diasMap[fecha].sincob++;
+    }
+  });
+
+  const tbody = document.getElementById('tabla-workers');
+  tbody.innerHTML = '';
+
+  Object.entries(map).sort((a,b)=>b[1].total-a[1].total).forEach(([nombre, s])=>{
+    const pct      = s.total ? Math.round(s.ap/s.total*100) : 0;
+    const colorPct = pct>=70?'#86efac':pct>=40?'#fcd34d':'#fca5a5';
+
+    const diasActivos = Object.keys(s.diasMap).length;
+    const promedio    = diasActivos ? (s.total/diasActivos).toFixed(1) : '0';
+    const colorProm   = parseFloat(promedio) < 5 ? '#ef4444' : parseFloat(promedio) < 10 ? '#fcd34d' : '#86efac';
+
+    // Cantidad del día filtrado
+    const cantDia  = diaFiltro ? (s.diasMap[diaFiltro]?.total || 0) : null;
+    const colorDia = cantDia === null ? '' : cantDia < 5 ? '#ef4444' : cantDia < 10 ? '#fcd34d' : '#86efac';
+
+    const esRojoHoy = diaFiltro && cantDia !== null && cantDia < 5;
+    const rowBg     = esRojoHoy ? 'background:rgba(239,68,68,.08);' : '';
+
+    const tr = document.createElement('tr');
+    tr.style.cssText = rowBg + 'cursor:pointer';
+    tr.title = 'Click para ver detalle diario';
+    tr.innerHTML = `
+      <td>
+        <div class="worker-row">
+          <div class="worker-avatar" style="${esRojoHoy?'background:linear-gradient(135deg,#ef4444,#dc2626)':''}">${nombre.charAt(0).toUpperCase()}</div>
+          <span style="color:#fff;font-weight:600">${esc(nombre)}</span>
+          ${esRojoHoy?'<span style="font-size:.65rem;background:rgba(239,68,68,.2);color:#fca5a5;padding:.1rem .45rem;border-radius:20px;font-weight:700">⚠ Pocas</span>':''}
+        </div>
+      </td>
+      <td style="font-weight:700;color:#fff">${s.total}</td>
+      <td style="color:#86efac;font-weight:600">${s.ap}</td>
+      <td style="color:#fca5a5">${s.rech}</td>
+      <td style="color:#fcd34d">${s.sincob}</td>
+      <td><span style="font-weight:700;color:${colorPct}">${pct}%</span></td>
+      <td style="color:var(--text-secondary);border-left:1px solid rgba(255,255,255,.06)">${diasActivos}</td>
+      <td><span style="font-weight:700;color:${colorProm}">${promedio}</span></td>
+      ${diaFiltro ? `<td style="border-left:1px solid rgba(255,255,255,.06)"><span style="font-weight:800;font-size:1rem;color:${colorDia}">${cantDia}</span>${cantDia<5?'<span style="font-size:.65rem;color:#fca5a5;margin-left:.35rem">⚠ < 5</span>':''}</td>` : ''}
+    `;
+    tr.onclick = () => mostrarDetalleDiario(nombre, s.diasMap);
+    tbody.appendChild(tr);
+  });
+}
+
+// Detalle diario al hacer click en un trabajador
+function mostrarDetalleDiario(nombre, diasMap) {
+  const wrap = document.getElementById('detalle-diario-wrap');
+  document.getElementById('detalle-diario-nombre').textContent = nombre;
+  wrap.style.display = 'block';
+  wrap.scrollIntoView({ behavior:'smooth', block:'nearest' });
+
+  const tbody = document.getElementById('tabla-diario');
+  tbody.innerHTML = '';
+
+  const dias = Object.keys(diasMap).sort((a,b)=>b.localeCompare(a));
+  if(!dias.length){ tbody.innerHTML='<tr><td colspan="6" style="text-align:center;color:var(--text-muted)">Sin datos</td></tr>'; return; }
+
+  dias.forEach(fecha => {
+    const s   = diasMap[fecha];
+    const esPoca = s.total < 5;
+    const fechaFmt = new Date(fecha+'T12:00:00').toLocaleDateString('es-PE',{weekday:'short',day:'2-digit',month:'short',year:'numeric'});
+    const tr = document.createElement('tr');
+    tr.style.cssText = esPoca ? 'background:rgba(239,68,68,.07)' : '';
+    tr.innerHTML = `
+      <td style="font-weight:600;color:${esPoca?'#fca5a5':'#fff'}">${fechaFmt}</td>
+      <td>
+        <span style="font-weight:800;font-size:1.05rem;color:${esPoca?'#ef4444':s.total>=10?'#86efac':'#fcd34d'}">${s.total}</span>
+        ${esPoca?'<span style="font-size:.65rem;color:#fca5a5;margin-left:.35rem">⚠ pocas</span>':''}
+      </td>
+      <td style="color:#86efac">${s.ap}</td>
+      <td style="color:#fca5a5">${s.rech}</td>
+      <td style="color:#fcd34d">${s.sincob}</td>
+      <td>
+        <span style="font-size:.75rem;font-weight:600;padding:.2rem .6rem;border-radius:20px;${esPoca?'background:rgba(239,68,68,.2);color:#fca5a5':'background:rgba(34,197,94,.1);color:#86efac'}">
+          ${esPoca?'Bajo rendimiento':'OK'}
+        </span>
+      </td>`;
+    tbody.appendChild(tr);
+  });
 }
 
 function poblarFiltroOperadores() {
@@ -308,11 +425,11 @@ function aplicarFiltros() {
   const hasta    = document.getElementById('f-fecha-hasta').value;
 
   filtrados = todos.filter(d => {
-    if(dni    && !(d.dni||'').toLowerCase().includes(dni)) return false;
-    if(resultado && d.resultado !== resultado)             return false;
-    if(operador  && (d.operadorNombre||d.operador) !== operador) return false;
-    if(desde && d.fechaISO < desde) return false;
-    if(hasta && d.fechaISO > hasta+'T23:59:59') return false;
+    if(dni      && !(d.dni||'').toLowerCase().includes(dni))          return false;
+    if(resultado && d.resultado !== resultado)                         return false;
+    if(operador  && (d.operadorNombre||d.operador) !== operador)      return false;
+    if(desde     && d.fechaISO < desde)                               return false;
+    if(hasta     && d.fechaISO > hasta+'T23:59:59')                   return false;
     return true;
   });
 
@@ -325,6 +442,15 @@ function limpiarFiltros() {
     document.getElementById(id).value='';
   });
   aplicarFiltros();
+}
+
+// Filtrar la tabla de rendimiento por nombre de trabajador
+function filtrarTablaWorkers() {
+  const q = document.getElementById('f-buscar-worker').value.trim().toLowerCase();
+  document.querySelectorAll('#tabla-workers tr').forEach(tr => {
+    const nombre = tr.querySelector('td span[style*="font-weight:600"]')?.textContent?.toLowerCase() || '';
+    tr.style.display = (!q || nombre.includes(q)) ? '' : 'none';
+  });
 }
 
 function renderTabla() {
