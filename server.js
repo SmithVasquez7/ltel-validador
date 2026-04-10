@@ -116,6 +116,39 @@ if (!fs.existsSync(SHOTS_DIR)) fs.mkdirSync(SHOTS_DIR);
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
+// ─────────────────────────────────────────
+// GUARDAR EN FIRESTORE vía REST API (sin firebase-admin)
+// ─────────────────────────────────────────
+const FS_API_KEY  = 'AIzaSyDre3Wdt__AKKP2NGiv-I5ksqscoVPDsho';
+const FS_PROJECT  = 'softkes-ssi';
+const FS_COLL     = 'validacionesWIN';
+
+function toFsVal(v) {
+  if (v === null || v === undefined) return { nullValue: null };
+  if (typeof v === 'boolean')        return { booleanValue: v };
+  if (typeof v === 'number')         return Number.isInteger(v) ? { integerValue: String(v) } : { doubleValue: v };
+  if (typeof v === 'string')         return { stringValue: v };
+  return { stringValue: String(v) };
+}
+
+async function guardarEnFirestore(datos) {
+  const url = `https://firestore.googleapis.com/v1/projects/${FS_PROJECT}/databases/(default)/documents/${FS_COLL}?key=${FS_API_KEY}`;
+  const fields = {};
+  Object.entries(datos).forEach(([k, v]) => { fields[k] = toFsVal(v); });
+
+  const resp = await fetch(url, {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body:    JSON.stringify({ fields }),
+  });
+
+  const json = await resp.json();
+  if (!resp.ok) throw new Error(json.error?.message || `HTTP ${resp.status}`);
+  const docId = json.name.split('/').pop();
+  console.log(`  ✅ Firestore OK → validacionesWIN/${docId}`);
+  return docId;
+}
+
 async function shot(page, name) {
   try {
     await page.screenshot({ path: path.join(SHOTS_DIR, `${name}_${Date.now()}.png`) });
@@ -438,6 +471,19 @@ async function ejecutarValidacion(datos) {
   await shot(pg, '12_cobertura_leida');
 
   if (!tieneCobertura) {
+    try {
+      await guardarEnFirestore({
+        dni:       datos.dni      || '',
+        direccion: datos.tipo === 'calle'
+          ? `${datos.via||''} ${datos.numero||''}${datos.hhuu?' - '+datos.hhuu:''}, ${datos.distrito||''}`
+          : (datos.direccion || ''),
+        tipo:      datos.tipo     || 'calle',
+        distrito:  datos.distrito || '', hhuu: datos.hhuu||'', via: datos.via||'', numero: datos.numero||'',
+        resultado: 'sin_cobertura', detalleResultado: 'La dirección NO tiene cobertura WIN',
+        scoreNum: -1, aprobado: false, tieneCobertura: false,
+        fechaISO: new Date().toISOString(),
+      });
+    } catch(e) { console.error(`  ❌ Firestore NO guardó (sin_cobertura): ${e.message}`); }
     return {
       ok:        true,
       resultado: 'sin_cobertura',
@@ -542,6 +588,30 @@ async function ejecutarValidacion(datos) {
 
   console.log(`  📊 Score: ${scoreNum} | Aprobado (≥301): ${aprobado}`);
 
+  // ── Guardar en Firestore desde el servidor ──────────────────────
+  const resultado = aprobado ? 'aprobado' : 'rechazado';
+  try {
+    await guardarEnFirestore({
+      dni:              datos.dni       || '',
+      direccion:        datos.tipo === 'calle'
+        ? `${datos.via||''} ${datos.numero||''}${datos.hhuu?' - '+datos.hhuu:''}, ${datos.distrito||''}`
+        : (datos.direccion || ''),
+      tipo:             datos.tipo      || 'calle',
+      distrito:         datos.distrito  || '',
+      hhuu:             datos.hhuu      || '',
+      via:              datos.via       || '',
+      numero:           datos.numero    || '',
+      resultado,
+      detalleResultado: scoreDetalle    || '',
+      scoreNum:         scoreNum        !== null ? scoreNum : -1,
+      aprobado,
+      tieneCobertura:   true,
+      fechaISO:         new Date().toISOString(),
+    });
+  } catch(fsErr) {
+    console.error(`  ❌ Firestore NO guardó: ${fsErr.message}`);
+  }
+
   // ── Volver atrás para dejar la plataforma lista para la siguiente consulta ──
   console.log('  ← Volviendo atrás para nueva consulta...');
   await pg.goBack({ waitUntil: 'domcontentloaded', timeout: 15000 }).catch(() => {});
@@ -549,7 +619,7 @@ async function ejecutarValidacion(datos) {
 
   return {
     ok:             true,
-    resultado:      aprobado ? 'aprobado' : 'rechazado',
+    resultado,
     detalle:        scoreDetalle || scoreTitulo || 'Score obtenido',
     scoreTitulo,
     scoreDetalle,
