@@ -625,20 +625,48 @@ function setTipo(t){
   document.getElementById('longitud').required=t==='coords';
 }
 
-// URL del servidor: configurable desde el panel (guardada en localStorage)
-// En local usa localhost, en Hostinger usa la URL que configure el admin
-function getServerURL() {
-  if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-    return 'http://localhost:3000';
+// URL del servidor — se guarda en Firestore (doc config/servidor)
+// El admin la configura UNA VEZ y todos los trabajadores la obtienen automáticamente
+let SERVER = '';
+
+const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+
+async function cargarServerURL() {
+  if (isLocal) {
+    SERVER = 'http://localhost:3000';
+    document.getElementById('btn-server-url').style.display = 'none';
+    return;
   }
-  return localStorage.getItem('ltel_server_url') || '';
+  try {
+    const snap = await db.collection('config').doc('servidor').get({ source: 'server' });
+    if (snap.exists && snap.data().url) {
+      SERVER = snap.data().url;
+      document.getElementById('lbl-server-url').textContent = SERVER.replace(/^https?:\/\//, '').slice(0, 22) + '…';
+      // Solo admin ve el botón de configurar
+      if (session.rol !== 'admin') {
+        document.getElementById('btn-server-url').style.display = 'none';
+      }
+    } else {
+      // Sin URL — solo admin puede configurar
+      if (session.rol === 'admin') {
+        document.getElementById('btn-server-url').style.background = 'rgba(239,68,68,.15)';
+        document.getElementById('btn-server-url').style.borderColor = 'rgba(239,68,68,.4)';
+        document.getElementById('btn-server-url').style.color = '#fca5a5';
+        document.getElementById('lbl-server-url').textContent = '⚠ Configurar URL';
+      } else {
+        document.getElementById('btn-server-url').style.display = 'none';
+      }
+    }
+  } catch(e) {
+    console.warn('No se pudo leer URL del servidor:', e.message);
+  }
 }
-let SERVER = getServerURL();
 
 // ── Verificar servidor al cargar ──
 async function checkServidor(){
+  if (!SERVER) return;
   try{
-    const r=await fetch(`${SERVER}/estado`,{signal:AbortSignal.timeout(2000)});
+    const r=await fetch(`${SERVER}/estado`,{signal:AbortSignal.timeout(4000)});
     const d=await r.json();
     const badge=document.getElementById('server-badge');
     if(d.ok){
@@ -662,37 +690,26 @@ function mostrarAlertaCreds(){
   document.getElementById('alert-creds').style.display='flex';
 }
 
-// ── URL Servidor ──
+// ── URL Servidor (solo admin) ──
 function abrirModalServerURL(){
-  const actual = localStorage.getItem('ltel_server_url') || '';
-  document.getElementById('input-server-url').value = actual;
+  if(session.rol !== 'admin'){ alert('Solo el administrador puede configurar la URL del servidor.'); return; }
+  document.getElementById('input-server-url').value = SERVER || '';
   document.getElementById('modal-server-url').style.display = 'flex';
 }
-function guardarServerURL(){
+async function guardarServerURL(){
   let url = document.getElementById('input-server-url').value.trim().replace(/\/$/, '');
   if(!url){ alert('Ingresa una URL válida'); return; }
-  localStorage.setItem('ltel_server_url', url);
-  SERVER = url;
-  document.getElementById('modal-server-url').style.display = 'none';
-  document.getElementById('lbl-server-url').textContent = url.replace(/^https?:\/\//, '').slice(0, 20) + '…';
-  checkServidor();
-}
-// Mostrar URL configurada en el botón al cargar
-(function(){
-  const saved = localStorage.getItem('ltel_server_url');
-  const isLocal = window.location.hostname==='localhost'||window.location.hostname==='127.0.0.1';
-  if(isLocal){
-    document.getElementById('btn-server-url').style.display = 'none'; // no necesario en local
-  } else if(saved){
-    document.getElementById('lbl-server-url').textContent = saved.replace(/^https?:\/\//, '').slice(0, 20) + '…';
-  } else {
-    // Sin URL configurada — mostrar alerta
-    document.getElementById('btn-server-url').style.background = 'rgba(239,68,68,.15)';
-    document.getElementById('btn-server-url').style.borderColor = 'rgba(239,68,68,.4)';
-    document.getElementById('btn-server-url').style.color = '#fca5a5';
-    document.getElementById('lbl-server-url').textContent = '⚠ Configurar URL';
+  try {
+    // Guardar en Firestore — todos los trabajadores la leerán automáticamente
+    await db.collection('config').doc('servidor').set({ url, actualizadoPor: session.usuario, fecha: new Date().toISOString() });
+    SERVER = url;
+    document.getElementById('modal-server-url').style.display = 'none';
+    document.getElementById('lbl-server-url').textContent = url.replace(/^https?:\/\//, '').slice(0, 22) + '…';
+    checkServidor();
+  } catch(e) {
+    alert('Error al guardar: ' + e.message);
   }
-})();
+}
 
 // ── Validar form ──
 document.getElementById('validForm').addEventListener('submit',async(e)=>{
@@ -1076,7 +1093,8 @@ document.getElementById('dni').addEventListener('input',function(){
 
 loadHistorial();
 loadStats();
-checkServidor();
+// Cargar URL del servidor desde Firestore y luego verificar conexión
+cargarServerURL().then(() => checkServidor());
 </script>
 </body>
 </html>
