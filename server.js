@@ -624,7 +624,7 @@ async function ejecutarValidacion(datos) {
   // Se usa el mínimo: si algún extremo del rango está bajo 301, no califica
   const numeros = scoreDetalle.match(/\d+/g);
   const scoreNum = numeros ? Math.min(...numeros.map(Number)) : null;
-  const aprobado = scoreNum !== null && scoreNum >= 301;
+  const aprobado = tieneCobertura && scoreNum !== null && scoreNum >= 301;
 
   console.log(`  📊 Score: ${scoreNum} | Aprobado (≥301): ${aprobado}`);
 
