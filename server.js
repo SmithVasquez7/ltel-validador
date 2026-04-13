@@ -312,9 +312,19 @@ async function ejecutarValidacion(datos) {
   // Registrar quién está corriendo esta validación
   progreso.operadorActivo      = datos.operador      || '';
   progreso.operadorNombreActivo = datos.operadorNombre || datos.operador || '';
+  cancelarFlag = false; // resetear al inicio de cada validación
   const pg = await getPage();
 
+  // Helper para verificar cancelación en cualquier punto del flujo
+  function checkCancelar() {
+    if (cancelarFlag) {
+      cancelarFlag = false;
+      throw new Error('CANCELADO: La validación fue cancelada por el operador');
+    }
+  }
+
   // Login inicial o re-login si la sesión expiró
+  checkCancelar();
   if (!loggedIn) {
     await doLogin(pg);
   } else {
@@ -322,6 +332,7 @@ async function ejecutarValidacion(datos) {
   }
 
   // ── PASO 1: Clic en menú "Ventas" ──────────────────────────────
+  checkCancelar();
   setProgreso(2, 'Navegando al menú Ventas...', '📋');
   console.log('📌 Paso 1: Navegando a Ventas...');
   await checkSesionWIN(pg);
@@ -358,6 +369,7 @@ async function ejecutarValidacion(datos) {
   await shot(pg, '05_pagina_nuevo_lead');
 
   // ── PASO 3: Clic en botón "Añadir nuevo Lead" (abre el modal) ──
+  checkCancelar();
   setProgreso(4, 'Abriendo formulario (Añadir nuevo Lead)...', '📋');
   console.log('📌 Paso 3: Clic en botón "Añadir nuevo Lead"...');
   try {
@@ -418,6 +430,7 @@ async function ejecutarValidacion(datos) {
   }
 
   // ── PASO 5: Clic en Buscar ─────────────────────────────────────
+  checkCancelar();
   setProgreso(6, 'Buscando ubicación en mapa...', '🗺️');
   console.log('📌 Paso 5: Buscando en mapa...');
   const selBuscar = datos.tipo === 'coords' ? WIN.sel.btn_buscar_coord : WIN.sel.btn_buscar;
@@ -457,6 +470,7 @@ async function ejecutarValidacion(datos) {
   await shot(pg, '09_confirmar_clicked');
 
   // ── PASO 7: Clic en Continuar ─────────────────────────────────
+  checkCancelar();
   setProgreso(8, 'Avanzando a información del cliente...', '➡️');
   console.log('📌 Paso 7: Esperando y clicando Continuar...');
   await pg.waitForSelector(WIN.sel.btn_continuar, { timeout: 25000 });
@@ -553,6 +567,7 @@ async function ejecutarValidacion(datos) {
   await shot(pg, '14_dni_ingresado');
 
   // ── PASO 11: Clic en buscar score ─────────────────────────────
+  checkCancelar();
   setProgreso(11, 'Consultando score crediticio...', '📊');
   console.log('📌 Paso 11: Buscando score del cliente...');
   await pg.waitForSelector(WIN.sel.btn_buscar_score, { timeout: 5000 });
@@ -866,6 +881,15 @@ app.post('/validar', async (req, res) => {
     }
     res.status(500).json({ ok: false, error: e.message });
   }
+});
+
+// Cancelar validación en curso
+let cancelarFlag = false;
+app.post('/cancelar', (_req, res) => {
+  if (!colaOcupada) return res.json({ ok: false, msg: 'No hay validación en curso' });
+  cancelarFlag = true;
+  console.log('⚠ Cancelación solicitada por el trabajador');
+  res.json({ ok: true, msg: 'Cancelación en proceso...' });
 });
 
 // Guardar credenciales WIN
