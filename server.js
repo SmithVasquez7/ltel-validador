@@ -230,42 +230,59 @@ async function doLogin(pg) {
     throw new Error('No apareció el botón "Iniciar con Google": ' + e.message);
   }
 
-  // ── Paso 3: Google OAuth — ingresar email ──
-  setProgreso(1, 'Ingresando correo en Google...', '📧');
-  console.log('  → Esperando campo email de Google...');
-  await pg.waitForSelector('#identifierId', { timeout: 20000 });
-  await pg.click('#identifierId', { clickCount: 3 });
-  await pg.type('#identifierId', WIN.creds.usuario, { delay: 60 });
-  await shot(pg, '03_google_email');
-  await pg.click('#identifierNext');
-  console.log('  → Email enviado, esperando pantalla de contraseña...');
-  await sleep(2000); // esperar transición de pantalla
+  // ── Pasos 3-5: Google OAuth (solo si Google pide credenciales) ──
+  // Si la sesión Google ya está activa, salta directo a WIN sin pedir email/password
+  setProgreso(1, 'Autenticando con Google...', '🔐');
+  console.log('  → Detectando si Google requiere credenciales o ya hay sesión activa...');
 
-  // ── Paso 4: Google OAuth — ingresar contraseña ──
-  setProgreso(1, 'Ingresando contraseña en Google...', '🔒');
-  await pg.waitForSelector('input[name="Passwd"]', { visible: true, timeout: 20000 });
-  await sleep(800);
-  await pg.click('input[name="Passwd"]', { clickCount: 3 });
-  await pg.type('input[name="Passwd"]', WIN.creds.password, { delay: 60 });
-  await shot(pg, '04_google_password');
-  await pg.click('#passwordNext');
-  console.log('  → Contraseña enviada...');
+  const googleRequiereCreds = await Promise.race([
+    // Opción A: Google pide email → hay que ingresar credenciales
+    pg.waitForSelector('#identifierId', { timeout: 18000 }).then(() => true).catch(() => false),
+    // Opción B: WIN ya cargó directamente (sesión Google activa)
+    pg.waitForFunction(
+      () => !window.location.href.includes('accounts.google.com'),
+      { timeout: 18000 }
+    ).then(() => false).catch(() => false),
+  ]);
 
-  // ── Paso 5: Posible pantalla "Continuar" ──
-  try {
-    await pg.waitForFunction(() => {
-      const spans = document.querySelectorAll('[jsname="V67aGc"]');
-      return [...spans].some(s => s.textContent.trim() === 'Continuar');
-    }, { timeout: 10000 });
-    await pg.evaluate(() => {
-      const spans = document.querySelectorAll('[jsname="V67aGc"]');
-      const btn = [...spans].find(s => s.textContent.trim() === 'Continuar');
-      if (btn) (btn.closest('button') || btn).click();
-    });
-    console.log('  → Clic en Continuar');
-    await shot(pg, '05_continuar');
-  } catch(_) {
-    console.log('  → Sin pantalla Continuar, siguiendo...');
+  if (googleRequiereCreds) {
+    console.log('  → Google pide credenciales — ingresando...');
+    setProgreso(1, 'Ingresando correo en Google...', '📧');
+    await pg.click('#identifierId', { clickCount: 3 });
+    await pg.type('#identifierId', WIN.creds.usuario, { delay: 60 });
+    await shot(pg, '03_google_email');
+    await pg.click('#identifierNext');
+    console.log('  → Email enviado, esperando pantalla de contraseña...');
+    await sleep(2000);
+
+    setProgreso(1, 'Ingresando contraseña en Google...', '🔒');
+    await pg.waitForSelector('input[name="Passwd"]', { visible: true, timeout: 20000 });
+    await sleep(800);
+    await pg.click('input[name="Passwd"]', { clickCount: 3 });
+    await pg.type('input[name="Passwd"]', WIN.creds.password, { delay: 60 });
+    await shot(pg, '04_google_password');
+    await pg.click('#passwordNext');
+    console.log('  → Contraseña enviada...');
+
+    // Posible pantalla "Continuar"
+    try {
+      await pg.waitForFunction(() => {
+        const spans = document.querySelectorAll('[jsname="V67aGc"]');
+        return [...spans].some(s => s.textContent.trim() === 'Continuar');
+      }, { timeout: 10000 });
+      await pg.evaluate(() => {
+        const spans = document.querySelectorAll('[jsname="V67aGc"]');
+        const btn = [...spans].find(s => s.textContent.trim() === 'Continuar');
+        if (btn) (btn.closest('button') || btn).click();
+      });
+      console.log('  → Clic en Continuar');
+      await shot(pg, '05_continuar');
+    } catch(_) {
+      console.log('  → Sin pantalla Continuar, siguiendo...');
+    }
+  } else {
+    console.log('  → Sesión Google activa — WIN cargó directamente, saltando OAuth');
+    await shot(pg, '03_google_session_activa');
   }
 
   // ── Paso 6: Esperar que WIN cargue con menú ──
