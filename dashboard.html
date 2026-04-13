@@ -945,7 +945,9 @@ async function cancelarValidacion() {
 
 // ── Cerrar resultado y volver al formulario ──
 function cerrarResultado() {
-  document.getElementById('result-card').style.display = 'none';
+  const card = document.getElementById('result-card');
+  card.className = 'result-card'; // quitar clase 'show' — el CSS lo oculta, sin inline style
+  card.style.display = '';        // limpiar cualquier override inline
   document.getElementById('btn-ok-wrap').style.display = 'none';
   document.getElementById('btn-cancelar').disabled = false;
   document.getElementById('btn-cancelar').innerHTML = '<i class="fas fa-times-circle"></i>&nbsp; Cancelar validación';
