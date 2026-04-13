@@ -502,25 +502,28 @@ async function ejecutarValidacion(datos) {
   console.log('📌 Paso 8: Verificando cobertura...');
   let tieneCobertura = false;
   try {
-    // Esperar el h5 con texto exacto de cobertura (único en la página con ese contenido)
-    await pg.waitForFunction(() => {
-      const h5s = [...document.querySelectorAll('h5')];
-      return h5s.some(h => {
-        const t = h.textContent.trim().toLowerCase();
-        return t === 'tiene cobertura' || t === 'sin cobertura';
-      });
-    }, { timeout: 12000 });
-    await sleep(300);
-    const cobText = await pg.evaluate(() => {
-      const h5s = [...document.querySelectorAll('h5')];
-      const el = h5s.find(h => {
-        const t = h.textContent.trim().toLowerCase();
-        return t === 'tiene cobertura' || t === 'sin cobertura';
-      });
+    // Esperar que aparezca cualquier alert de cobertura (ambos tienen border-dashed)
+    await pg.waitForSelector(
+      '.alert.bg-light-success.border-dashed h5, .alert.bg-light-danger.border-dashed h5',
+      { timeout: 12000 }
+    );
+    await sleep(500);
+    // Verificar DANGER primero — si está presente, es definitivamente Sin Cobertura
+    const sinCobText = await pg.evaluate(() => {
+      const el = document.querySelector('.alert.bg-light-danger.border-dashed h5');
       return el ? el.textContent.trim() : null;
     });
-    tieneCobertura = cobText !== null && cobText.toLowerCase().startsWith('tiene');
-    console.log('  📍 Cobertura texto:', cobText, '→ tieneCobertura:', tieneCobertura);
+    if (sinCobText !== null) {
+      tieneCobertura = false;
+      console.log('  📍 Sin cobertura:', sinCobText);
+    } else {
+      const conCobText = await pg.evaluate(() => {
+        const el = document.querySelector('.alert.bg-light-success.border-dashed h5');
+        return el ? el.textContent.trim() : null;
+      });
+      tieneCobertura = conCobText !== null;
+      console.log('  📍 Tiene cobertura:', conCobText, '→', tieneCobertura);
+    }
   } catch(_) {
     console.warn('  ⚠ No se encontró alerta de cobertura (asumiendo sin cobertura)');
   }
@@ -664,7 +667,7 @@ async function ejecutarValidacion(datos) {
     scoreDetalle,
     scoreNum,
     aprobado,
-    tieneCobertura: true,
+    tieneCobertura,
     paso:           'score_obtenido',
   };
 }
