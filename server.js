@@ -178,11 +178,11 @@ async function getPage() {
         headless:        chromium.headless,
       };
     } else {
-      // Local: Chrome visible para supervisar la automatización
+      // Local: Chrome en segundo plano (headless) — el progreso se ve en el dashboard
       launchOptions = {
-        headless:        false,
-        defaultViewport: null,
-        args:            ['--no-sandbox', '--window-size=1100,750', '--window-position=200,50'],
+        headless:        'new',
+        defaultViewport: { width: 1280, height: 800 },
+        args:            ['--no-sandbox', '--disable-setuid-sandbox'],
       };
     }
 
