@@ -823,12 +823,23 @@ async function ejecutarConCola(datos) {
   try {
     return await ejecutarValidacion(datos);
   } catch(err) {
-    // Al fallar, resetear estado del browser para no dejar basura para la siguiente validación
-    console.log('⚠ Validación falló — reseteando estado del browser...');
+    console.log('⚠ Validación falló — limpiando estado...');
     try {
       if (page && !page.isClosed()) {
-        await page.goto(WIN.url_login, { waitUntil: 'domcontentloaded', timeout: 8000 }).catch(() => {});
-        loggedIn = false; // forzar re-login en la próxima validación
+        const esErrorSesion = err.message.toLowerCase().includes('login') ||
+                              err.message.toLowerCase().includes('sesi') ||
+                              err.message.toLowerCase().includes('google');
+        if (esErrorSesion) {
+          // Solo si es error de sesión, forzar re-login
+          loggedIn = false;
+          console.log('  → Error de sesión detectado, se hará re-login');
+        } else {
+          // Para cualquier otro error, volver a la página principal de WIN (sesión intacta)
+          await page.goto('https://appwinforce.win.pe/consultarpedidos', {
+            waitUntil: 'domcontentloaded', timeout: 8000
+          }).catch(() => {});
+          console.log('  → Browser redirigido a página principal WIN');
+        }
       }
     } catch(_) {}
     resetProgreso();

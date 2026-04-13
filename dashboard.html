@@ -771,6 +771,7 @@ document.getElementById('validForm').addEventListener('submit',async(e)=>{
   document.getElementById('result-card').scrollIntoView({behavior:'smooth', block:'start'});
 
   let docId='';
+  let esExito = false;
 
   // Tiempo de inicio para mostrar cuánto lleva esperando
   const inicioEspera = Date.now();
@@ -895,6 +896,7 @@ document.getElementById('validForm').addEventListener('submit',async(e)=>{
         uiTitle='✗ SIN COBERTURA';
         uiSub='La dirección no está dentro de la cobertura WIN';
       }
+      esExito = true;
       showResult(uiType, uiTitle, uiSub, [
         {label:'DNI',val:dni},
         {label:'Dirección',val:direccionResumen},
@@ -905,12 +907,14 @@ document.getElementById('validForm').addEventListener('submit',async(e)=>{
         {label:'Hora',val:horaStr},
       ]);
     } else {
+      esExito = false;
       showResult('error','Error en validación',data.error||'Error desconocido',[
         {label:'DNI',val:dni},{label:'Dirección',val:direccionResumen},
         {label:'Error',val:data.error||'Ver consola del servidor'},
       ]);
     }
   }catch(err){
+    esExito = false;
     showResult('error','Servidor no disponible',
       'Verifica que el servidor esté corriendo: node server.js',[
       {label:'DNI',val:dni},{label:'Dirección',val:direccionResumen},
@@ -923,9 +927,20 @@ document.getElementById('validForm').addEventListener('submit',async(e)=>{
   document.getElementById('liveview-wrap').style.display  = 'none';
   document.getElementById('banner-progreso').style.display = 'none';
   document.getElementById('banner-cola').style.display     = 'none';
-  document.getElementById('btn-ok-wrap').style.display     = 'block';
   btn.disabled=false; btn.classList.remove('loading');
-  setTimeout(()=>{ loadHistorial(); loadStats(); }, 3000);
+
+  if(esExito){
+    // Éxito: mostrar botón OK para que el trabajador confirme
+    document.getElementById('btn-ok-wrap').style.display = 'block';
+    setTimeout(()=>{ loadHistorial(); loadStats(); }, 3000);
+  } else {
+    // Error: ocultar OK, limpiar el error automáticamente en 5s y dejar el form listo
+    document.getElementById('btn-ok-wrap').style.display = 'none';
+    setTimeout(()=>{
+      cerrarResultado();
+      loadHistorial(); loadStats();
+    }, 5000);
+  }
 });
 
 // ── Cancelar validación en curso ──
