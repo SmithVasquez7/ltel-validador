@@ -502,44 +502,21 @@ async function ejecutarValidacion(datos) {
   console.log('📌 Paso 8: Verificando cobertura...');
   let tieneCobertura = false;
   try {
-    // Esperar que un alert de cobertura sea VISIBLE (puede haber ambos en el DOM ocultos)
+    // Esperar el h5.mb-1 con texto exacto de cobertura
     await pg.waitForFunction(() => {
-      const isVisible = el => {
-        if (!el) return false;
-        const s = window.getComputedStyle(el);
-        return s.display !== 'none' && s.visibility !== 'hidden' && s.opacity !== '0';
-      };
-      const danger  = document.querySelector('.alert.bg-light-danger.border-dashed');
-      const success = document.querySelector('.alert.bg-light-success.border-dashed');
-      return isVisible(danger) || isVisible(success);
+      const els = [...document.querySelectorAll('h5.mb-1')];
+      return els.some(h => h.textContent.trim() === 'Tiene Cobertura' || h.textContent.trim() === 'Sin Cobertura');
     }, { timeout: 12000 });
-    await sleep(400);
-
-    // Leer el alert VISIBLE — danger tiene prioridad
-    const resultado = await pg.evaluate(() => {
-      const isVisible = el => {
-        if (!el) return false;
-        const s = window.getComputedStyle(el);
-        return s.display !== 'none' && s.visibility !== 'hidden' && s.opacity !== '0';
-      };
-      const danger  = document.querySelector('.alert.bg-light-danger.border-dashed');
-      const success = document.querySelector('.alert.bg-light-success.border-dashed');
-      if (isVisible(danger))  return { tipo: 'danger',  texto: (danger.querySelector('h5') || {}).textContent || 'Sin Cobertura' };
-      if (isVisible(success)) return { tipo: 'success', texto: (success.querySelector('h5') || {}).textContent || 'Tiene Cobertura' };
-      return null;
+    await sleep(300);
+    const cobText = await pg.evaluate(() => {
+      const els = [...document.querySelectorAll('h5.mb-1')];
+      const el = els.find(h => h.textContent.trim() === 'Tiene Cobertura' || h.textContent.trim() === 'Sin Cobertura');
+      return el ? el.textContent.trim() : null;
     });
-
-    if (resultado && resultado.tipo === 'danger') {
-      tieneCobertura = false;
-      console.log('  📍 Sin cobertura (visible):', resultado.texto.trim());
-    } else if (resultado && resultado.tipo === 'success') {
-      tieneCobertura = true;
-      console.log('  📍 Tiene cobertura (visible):', resultado.texto.trim());
-    } else {
-      console.warn('  ⚠ No se encontró alert de cobertura visible');
-    }
+    tieneCobertura = cobText === 'Tiene Cobertura';
+    console.log('  📍 Cobertura:', cobText, '→ tieneCobertura:', tieneCobertura);
   } catch(_) {
-    console.warn('  ⚠ No se encontró alerta de cobertura (asumiendo sin cobertura)');
+    console.warn('  ⚠ No se encontró h5.mb-1 de cobertura (asumiendo sin cobertura)');
   }
   await shot(pg, '12_cobertura_leida');
 
