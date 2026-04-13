@@ -502,27 +502,41 @@ async function ejecutarValidacion(datos) {
   console.log('📌 Paso 8: Verificando cobertura...');
   let tieneCobertura = false;
   try {
-    // Esperar que aparezca cualquier alert de cobertura (ambos tienen border-dashed)
-    await pg.waitForSelector(
-      '.alert.bg-light-success.border-dashed h5, .alert.bg-light-danger.border-dashed h5',
-      { timeout: 12000 }
-    );
-    await sleep(500);
-    // Verificar DANGER primero — si está presente, es definitivamente Sin Cobertura
-    const sinCobText = await pg.evaluate(() => {
-      const el = document.querySelector('.alert.bg-light-danger.border-dashed h5');
-      return el ? el.textContent.trim() : null;
+    // Esperar que un alert de cobertura sea VISIBLE (puede haber ambos en el DOM ocultos)
+    await pg.waitForFunction(() => {
+      const isVisible = el => {
+        if (!el) return false;
+        const s = window.getComputedStyle(el);
+        return s.display !== 'none' && s.visibility !== 'hidden' && s.opacity !== '0';
+      };
+      const danger  = document.querySelector('.alert.bg-light-danger.border-dashed');
+      const success = document.querySelector('.alert.bg-light-success.border-dashed');
+      return isVisible(danger) || isVisible(success);
+    }, { timeout: 12000 });
+    await sleep(400);
+
+    // Leer el alert VISIBLE — danger tiene prioridad
+    const resultado = await pg.evaluate(() => {
+      const isVisible = el => {
+        if (!el) return false;
+        const s = window.getComputedStyle(el);
+        return s.display !== 'none' && s.visibility !== 'hidden' && s.opacity !== '0';
+      };
+      const danger  = document.querySelector('.alert.bg-light-danger.border-dashed');
+      const success = document.querySelector('.alert.bg-light-success.border-dashed');
+      if (isVisible(danger))  return { tipo: 'danger',  texto: (danger.querySelector('h5') || {}).textContent || 'Sin Cobertura' };
+      if (isVisible(success)) return { tipo: 'success', texto: (success.querySelector('h5') || {}).textContent || 'Tiene Cobertura' };
+      return null;
     });
-    if (sinCobText !== null) {
+
+    if (resultado && resultado.tipo === 'danger') {
       tieneCobertura = false;
-      console.log('  📍 Sin cobertura:', sinCobText);
+      console.log('  📍 Sin cobertura (visible):', resultado.texto.trim());
+    } else if (resultado && resultado.tipo === 'success') {
+      tieneCobertura = true;
+      console.log('  📍 Tiene cobertura (visible):', resultado.texto.trim());
     } else {
-      const conCobText = await pg.evaluate(() => {
-        const el = document.querySelector('.alert.bg-light-success.border-dashed h5');
-        return el ? el.textContent.trim() : null;
-      });
-      tieneCobertura = conCobText !== null;
-      console.log('  📍 Tiene cobertura:', conCobText, '→', tieneCobertura);
+      console.warn('  ⚠ No se encontró alert de cobertura visible');
     }
   } catch(_) {
     console.warn('  ⚠ No se encontró alerta de cobertura (asumiendo sin cobertura)');

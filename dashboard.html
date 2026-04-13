@@ -890,7 +890,9 @@ document.getElementById('validForm').addEventListener('submit',async(e)=>{
       } else if(esRechazado){
         uiType='error';
         uiTitle=`✗ RECHAZADO — Score: ${scoreNum??'N/D'}`;
-        uiSub='Tiene cobertura pero el score es insuficiente (<301)';
+        uiSub = !tieneCob
+          ? 'Sin cobertura WIN' + (scoreNum!=null && scoreNum>=301 ? ' (score sí califica)' : '')
+          : 'Tiene cobertura pero el score es insuficiente (<301)';
       } else {
         uiType='error';
         uiTitle='✗ SIN COBERTURA';
@@ -901,7 +903,7 @@ document.getElementById('validForm').addEventListener('submit',async(e)=>{
         {label:'DNI',val:dni},
         {label:'Dirección',val:direccionResumen},
         {label:'Cobertura WIN',val:tieneCob?'✅ Tiene cobertura':'❌ Sin cobertura'},
-        {label:'Score cliente',val:scoreNum!=null?`${scoreNum} (${aprobado?'✅ Aprobado':'❌ Rechazado'})`:'—'},
+        {label:'Score cliente',val:scoreNum!=null?`${scoreNum} (${scoreNum>=301?'✅ Aprobado':'❌ Rechazado'})`:'—'},
         {label:'Detalle score',val:data.detalle||'—'},
         {label:'Operador',val:session.nombre||session.usuario},
         {label:'Hora',val:horaStr},
