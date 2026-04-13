@@ -502,21 +502,33 @@ async function ejecutarValidacion(datos) {
   console.log('📌 Paso 8: Verificando cobertura...');
   let tieneCobertura = false;
   try {
-    // Esperar cualquier alerta de cobertura (éxito o sin cobertura)
+    // Esperar que aparezca el h5 de cobertura (puede ser danger o success)
     await pg.waitForFunction(
-      () => document.querySelector('.alert.bg-light-success h5, .alert.bg-light-danger h5') !== null,
+      () => {
+        const h5s = document.querySelectorAll('.alert h5');
+        return [...h5s].some(h => h.textContent.toLowerCase().includes('cobertura'));
+      },
       { timeout: 12000 }
     );
     await sleep(500);
-    // Leer el texto del primer alert encontrado
-    const cobText = await pg.$eval(
-      '.alert.bg-light-success h5, .alert.bg-light-danger h5',
-      el => el.textContent.trim()
-    );
-    const lower = cobText.toLowerCase();
-    // "Tiene cobertura" → true | "Sin Cobertura" → false
-    tieneCobertura = lower.includes('cobertura') && !lower.includes('sin');
-    console.log('  📍 Cobertura texto:', cobText, '→ tieneCobertura:', tieneCobertura);
+
+    // Verificar PRIMERO si existe bg-light-danger → definitivamente SIN cobertura
+    const esDanger = await pg.$('.alert.bg-light-danger h5').catch(() => null);
+    if (esDanger) {
+      const txt = await pg.$eval('.alert.bg-light-danger h5', el => el.textContent.trim());
+      tieneCobertura = false;
+      console.log('  📍 Sin cobertura (alert danger):', txt, '→ tieneCobertura: false');
+    } else {
+      // Buscar bg-light-success → TIENE cobertura
+      const esSuccess = await pg.$('.alert.bg-light-success h5').catch(() => null);
+      if (esSuccess) {
+        const txt = await pg.$eval('.alert.bg-light-success h5', el => el.textContent.trim());
+        tieneCobertura = true;
+        console.log('  📍 Tiene cobertura (alert success):', txt, '→ tieneCobertura: true');
+      } else {
+        console.warn('  ⚠ Alert encontrado pero sin clase danger/success → asumiendo sin cobertura');
+      }
+    }
   } catch(_) {
     console.warn('  ⚠ No se encontró alerta de cobertura (asumiendo sin cobertura)');
   }
