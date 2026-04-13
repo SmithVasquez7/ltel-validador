@@ -512,6 +512,14 @@ async function ejecutarValidacion(datos) {
     );
     await sleep(300);
 
+    // DEBUG: mostrar todos los spans con "cobertura" para entender la estructura
+    const debugSpans = await pg.evaluate(() =>
+      [...document.querySelectorAll('span')]
+        .filter(s => s.textContent.toLowerCase().includes('cobertura'))
+        .map(s => s.textContent.trim().substring(0, 120))
+    );
+    console.log('  🔍 DEBUG spans cobertura:', JSON.stringify(debugSpans));
+
     const cobText = await pg.evaluate(() => {
       const sp = [...document.querySelectorAll('span')].find(s =>
         s.textContent.includes('dentro de la cobertura')
