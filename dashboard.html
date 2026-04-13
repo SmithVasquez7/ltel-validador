@@ -953,7 +953,7 @@ async function cancelarValidacion() {
   btn.disabled = true;
   btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>&nbsp; Cancelando...';
   try {
-    await fetch(`${SERVER}/cancelar`, { method:'POST', headers:{'ngrok-skip-browser-warning':'1'} });
+    await fetch(`${SERVER}/cancelar`, { method:'POST', headers:{'ngrok-skip-browser-warning':'1','Content-Type':'application/json'}, body: JSON.stringify({ operador: session.usuario }) });
   } catch(_) {}
   cancelando = false;
 }

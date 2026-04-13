@@ -909,10 +909,15 @@ app.post('/validar', async (req, res) => {
 
 // Cancelar validación en curso
 let cancelarFlag = false;
-app.post('/cancelar', (_req, res) => {
+app.post('/cancelar', (req, res) => {
   if (!colaOcupada) return res.json({ ok: false, msg: 'No hay validación en curso' });
+  const { operador } = req.body || {};
+  // Solo el operador que inició la validación puede cancelarla
+  if (operador && progreso.operadorActivo && operador !== progreso.operadorActivo) {
+    return res.json({ ok: false, msg: 'No puedes cancelar la validación de otro trabajador' });
+  }
   cancelarFlag = true;
-  console.log('⚠ Cancelación solicitada por el trabajador');
+  console.log(`⚠ Cancelación solicitada por: ${operador || 'desconocido'}`);
   res.json({ ok: true, msg: 'Cancelación en proceso...' });
 });
 
