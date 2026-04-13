@@ -502,11 +502,21 @@ async function ejecutarValidacion(datos) {
   console.log('📌 Paso 8: Verificando cobertura...');
   let tieneCobertura = false;
   try {
-    await pg.waitForSelector(WIN.sel.alert_cobertura, { timeout: 12000 });
+    // Esperar cualquier alerta de cobertura (éxito o sin cobertura)
+    await pg.waitForFunction(
+      () => document.querySelector('.alert.bg-light-success h5, .alert.bg-light-danger h5') !== null,
+      { timeout: 12000 }
+    );
     await sleep(500);
-    const cobText = await pg.$eval(WIN.sel.alert_cobertura, el => el.textContent.trim());
-    tieneCobertura = cobText.toLowerCase().includes('cobertura');
-    console.log('  📍 Cobertura:', cobText, '→', tieneCobertura);
+    // Leer el texto del primer alert encontrado
+    const cobText = await pg.$eval(
+      '.alert.bg-light-success h5, .alert.bg-light-danger h5',
+      el => el.textContent.trim()
+    );
+    const lower = cobText.toLowerCase();
+    // "Tiene cobertura" → true | "Sin Cobertura" → false
+    tieneCobertura = lower.includes('cobertura') && !lower.includes('sin');
+    console.log('  📍 Cobertura texto:', cobText, '→ tieneCobertura:', tieneCobertura);
   } catch(_) {
     console.warn('  ⚠ No se encontró alerta de cobertura (asumiendo sin cobertura)');
   }
