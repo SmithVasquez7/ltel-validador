@@ -530,29 +530,7 @@ async function ejecutarValidacion(datos) {
   }
   await shot(pg, '12_cobertura_leida');
 
-  if (!tieneCobertura) {
-    try {
-      await guardarEnFirestore({
-        dni:       datos.dni      || '',
-        direccion: datos.tipo === 'calle'
-          ? `${datos.via||''} ${datos.numero||''}${datos.hhuu?' - '+datos.hhuu:''}, ${datos.distrito||''}`
-          : (datos.direccion || ''),
-        tipo:      datos.tipo     || 'calle',
-        distrito:  datos.distrito || '', hhuu: datos.hhuu||'', via: datos.via||'', numero: datos.numero||'',
-        resultado: 'sin_cobertura', detalleResultado: 'La dirección NO tiene cobertura WIN',
-        scoreNum: -1, aprobado: false, tieneCobertura: false,
-        operador:       datos.operador       || '',
-        operadorNombre: datos.operadorNombre || '',
-        fechaISO: new Date().toISOString(),
-      });
-    } catch(e) { console.error(`  ❌ Firestore NO guardó (sin_cobertura): ${e.message}`); }
-    return {
-      ok:        true,
-      resultado: 'sin_cobertura',
-      detalle:   'La dirección NO tiene cobertura WIN',
-      paso:      'cobertura_verificada',
-    };
-  }
+  // Siempre continúa a consultar el score del DNI, sin importar la cobertura
 
   // ── PASO 9: Seleccionar tipo de documento "DNI" ───────────────
   setProgreso(10, 'Seleccionando tipo de documento DNI...', '🪪');
@@ -668,7 +646,7 @@ async function ejecutarValidacion(datos) {
       detalleResultado: scoreDetalle    || '',
       scoreNum:         scoreNum        !== null ? scoreNum : -1,
       aprobado,
-      tieneCobertura:   true,
+      tieneCobertura,
       operador:         datos.operador       || '',
       operadorNombre:   datos.operadorNombre || '',
       fechaISO:         new Date().toISOString(),
