@@ -512,24 +512,21 @@ async function ejecutarValidacion(datos) {
     );
     await sleep(300);
 
-    // DEBUG: mostrar todos los spans con "cobertura" para entender la estructura
-    const debugSpans = await pg.evaluate(() =>
-      [...document.querySelectorAll('span')]
-        .filter(s => s.textContent.toLowerCase().includes('cobertura'))
-        .map(s => s.textContent.trim().substring(0, 120))
-    );
-    console.log('  🔍 DEBUG spans cobertura:', JSON.stringify(debugSpans));
-
+    // Ambos spans están en el DOM — buscar el que esté realmente visible (con dimensiones)
     const cobText = await pg.evaluate(() => {
-      const sp = [...document.querySelectorAll('span')].find(s =>
-        s.textContent.includes('dentro de la cobertura')
-      );
-      if (!sp) return null;
-      return sp.textContent.includes('no está') ? 'Sin Cobertura' : 'Tiene Cobertura';
+      const spans = [...document.querySelectorAll('span')]
+        .filter(s => s.textContent.includes('dentro de la cobertura'));
+      for (const sp of spans) {
+        const r = sp.getBoundingClientRect();
+        if (r.width > 0 && r.height > 0) {
+          return sp.textContent.includes('no está') ? 'Sin Cobertura' : 'Tiene Cobertura';
+        }
+      }
+      return null;
     });
 
     tieneCobertura = cobText === 'Tiene Cobertura';
-    console.log('  📍 Cobertura (span):', cobText, '→ tieneCobertura:', tieneCobertura);
+    console.log('  📍 Cobertura:', cobText, '→ tieneCobertura:', tieneCobertura);
   } catch(_) {
     console.warn('  ⚠ No se encontró span de cobertura (asumiendo sin cobertura)');
   }
