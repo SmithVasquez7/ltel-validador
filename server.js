@@ -502,20 +502,29 @@ async function ejecutarValidacion(datos) {
   console.log('📌 Paso 8: Verificando cobertura...');
   let tieneCobertura = false;
   try {
-    // Ambos alerts (éxito y sin cobertura) tienen clase border-dashed — esperar cualquiera
+    // Esperar que aparezca cualquier alert de cobertura (ambos tienen border-dashed)
     await pg.waitForSelector(
       '.alert.bg-light-success.border-dashed h5, .alert.bg-light-danger.border-dashed h5',
       { timeout: 12000 }
     );
     await sleep(500);
-    // Leer el h5 del alert de cobertura que apareció
-    const h5Text = await pg.evaluate(() => {
-      const el = document.querySelector('.alert.bg-light-success.border-dashed h5, .alert.bg-light-danger.border-dashed h5');
-      return el ? el.textContent.trim() : '';
+    // Verificar DANGER primero — si está presente, es definitivamente Sin Cobertura
+    const sinCobText = await pg.evaluate(() => {
+      const el = document.querySelector('.alert.bg-light-danger.border-dashed h5');
+      return el ? el.textContent.trim() : null;
     });
-    // "Tiene Cobertura" → true | "Sin Cobertura" → false
-    tieneCobertura = h5Text.toLowerCase().includes('tiene');
-    console.log('  📍 Cobertura alert:', h5Text, '→ tieneCobertura:', tieneCobertura);
+    if (sinCobText !== null) {
+      tieneCobertura = false;
+      console.log('  📍 Sin cobertura:', sinCobText);
+    } else {
+      // Solo success presente → Tiene Cobertura
+      const conCobText = await pg.evaluate(() => {
+        const el = document.querySelector('.alert.bg-light-success.border-dashed h5');
+        return el ? el.textContent.trim() : null;
+      });
+      tieneCobertura = conCobText !== null;
+      console.log('  📍 Tiene cobertura:', conCobText, '→', tieneCobertura);
+    }
   } catch(_) {
     console.warn('  ⚠ No se encontró alerta de cobertura (asumiendo sin cobertura)');
   }
