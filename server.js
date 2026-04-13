@@ -502,30 +502,22 @@ async function ejecutarValidacion(datos) {
   console.log('📌 Paso 8: Verificando cobertura...');
   let tieneCobertura = false;
   try {
-    // Esperar el alert de cobertura exitosa (bg-light-success)
-    await pg.waitForSelector('.alert.bg-light-success h5', { timeout: 12000 });
+    // Ambos alerts (éxito y sin cobertura) tienen clase border-dashed — esperar cualquiera
+    await pg.waitForSelector(
+      '.alert.bg-light-success.border-dashed h5, .alert.bg-light-danger.border-dashed h5',
+      { timeout: 12000 }
+    );
     await sleep(500);
-    // Aunque haya un success alert, verificar que NO haya también el de sin cobertura
-    // (bg-light-danger + border-dashed es único del alert "Sin Cobertura")
-    const sinCobEl = await pg.$('.alert.bg-light-danger.border-dashed h5').catch(() => null);
-    if (sinCobEl) {
-      const txt = await pg.$eval('.alert.bg-light-danger.border-dashed h5', el => el.textContent.trim());
-      tieneCobertura = false;
-      console.log('  📍 Sin cobertura (danger alert):', txt);
-    } else {
-      tieneCobertura = true;
-      const txt = await pg.$eval('.alert.bg-light-success h5', el => el.textContent.trim()).catch(() => '');
-      console.log('  📍 Tiene cobertura (success alert):', txt);
-    }
+    // Leer el h5 del alert de cobertura que apareció
+    const h5Text = await pg.evaluate(() => {
+      const el = document.querySelector('.alert.bg-light-success.border-dashed h5, .alert.bg-light-danger.border-dashed h5');
+      return el ? el.textContent.trim() : '';
+    });
+    // "Tiene Cobertura" → true | "Sin Cobertura" → false
+    tieneCobertura = h5Text.toLowerCase().includes('tiene');
+    console.log('  📍 Cobertura alert:', h5Text, '→ tieneCobertura:', tieneCobertura);
   } catch(_) {
-    // Sin success alert → verificar si hay danger explícito
-    const sinCobEl = await pg.$('.alert.bg-light-danger.border-dashed h5').catch(() => null);
-    if (sinCobEl) {
-      const txt = await pg.$eval('.alert.bg-light-danger.border-dashed h5', el => el.textContent.trim());
-      console.warn('  📍 Sin cobertura confirmado (danger alert):', txt);
-    } else {
-      console.warn('  ⚠ No se encontró alerta de cobertura (asumiendo sin cobertura)');
-    }
+    console.warn('  ⚠ No se encontró alerta de cobertura (asumiendo sin cobertura)');
   }
   await shot(pg, '12_cobertura_leida');
 
