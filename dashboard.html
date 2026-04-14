@@ -475,14 +475,21 @@ tr:hover td{background:rgba(255,255,255,.02)}
         </div>
 
         <div class="form-grid">
-          <!-- DNI -->
+          <!-- DNI / RUC -->
           <div class="form-group">
-            <label class="form-label">DNI del Cliente</label>
+            <label class="form-label" id="label-doc">DNI del Cliente</label>
+            <!-- Selector de tipo -->
+            <div style="display:flex;gap:.4rem;margin-bottom:.5rem">
+              <button type="button" id="btn-tipo-dni" onclick="setTipoDoc('DNI')"
+                style="flex:1;padding:.35rem 0;border-radius:6px;border:1.5px solid var(--primary);background:var(--primary);color:#fff;font-size:.78rem;font-weight:700;cursor:pointer;transition:all .2s">DNI</button>
+              <button type="button" id="btn-tipo-ruc" onclick="setTipoDoc('RUC')"
+                style="flex:1;padding:.35rem 0;border-radius:6px;border:1.5px solid var(--border);background:transparent;color:var(--text-muted);font-size:.78rem;font-weight:600;cursor:pointer;transition:all .2s">RUC</button>
+            </div>
             <div class="form-input-wrap">
               <i class="fas fa-id-card form-icon"></i>
               <input type="text" id="dni" class="form-input" placeholder="Ej: 12345678" maxlength="8" pattern="[0-9]{8}" required>
             </div>
-            <div class="form-hint"><i class="fas fa-info-circle"></i> 8 dígitos numéricos</div>
+            <div class="form-hint" id="hint-doc"><i class="fas fa-info-circle"></i> 8 dígitos numéricos</div>
           </div>
 
           <!-- Distrito/Provincia/Dpto -->
@@ -841,7 +848,7 @@ document.getElementById('validForm').addEventListener('submit',async(e)=>{
       method:'POST',
       headers:{'Content-Type':'application/json','ngrok-skip-browser-warning':'1'},
       body:JSON.stringify({
-        dni, tipo:tipoActual,
+        dni, tipo:tipoActual, tipoDoc: tipoDocActual,
         // calle
         distrito, hhuu, via, numero,
         // coords
@@ -1151,9 +1158,35 @@ function abrirDetalle(id, d) {
   modal.style.display = 'flex';
 }
 
-// ── Validar solo números en DNI ──
+// ── Tipo de documento (DNI / RUC) ──
+let tipoDocActual = 'DNI';
+function setTipoDoc(tipo) {
+  tipoDocActual = tipo;
+  const inp   = document.getElementById('dni');
+  const label = document.getElementById('label-doc');
+  const hint  = document.getElementById('hint-doc');
+  const btnDNI = document.getElementById('btn-tipo-dni');
+  const btnRUC = document.getElementById('btn-tipo-ruc');
+  if (tipo === 'RUC') {
+    inp.maxLength = 11; inp.pattern = '[0-9]{11}'; inp.placeholder = 'Ej: 20123456789';
+    label.textContent = 'RUC del Cliente';
+    hint.innerHTML = '<i class="fas fa-info-circle"></i> 11 dígitos numéricos';
+    btnRUC.style.background = 'var(--primary)'; btnRUC.style.color = '#fff'; btnRUC.style.borderColor = 'var(--primary)';
+    btnDNI.style.background = 'transparent'; btnDNI.style.color = 'var(--text-muted)'; btnDNI.style.borderColor = 'var(--border)';
+  } else {
+    inp.maxLength = 8; inp.pattern = '[0-9]{8}'; inp.placeholder = 'Ej: 12345678';
+    label.textContent = 'DNI del Cliente';
+    hint.innerHTML = '<i class="fas fa-info-circle"></i> 8 dígitos numéricos';
+    btnDNI.style.background = 'var(--primary)'; btnDNI.style.color = '#fff'; btnDNI.style.borderColor = 'var(--primary)';
+    btnRUC.style.background = 'transparent'; btnRUC.style.color = 'var(--text-muted)'; btnRUC.style.borderColor = 'var(--border)';
+  }
+  inp.value = '';
+}
+
+// ── Validar solo números en DNI/RUC ──
 document.getElementById('dni').addEventListener('input',function(){
-  this.value=this.value.replace(/\D/g,'').slice(0,8);
+  const max = tipoDocActual === 'RUC' ? 11 : 8;
+  this.value = this.value.replace(/\D/g,'').slice(0, max);
 });
 
 loadHistorial();

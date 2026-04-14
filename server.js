@@ -543,49 +543,49 @@ async function ejecutarValidacion(datos) {
 
   // Siempre continúa a consultar el score del DNI, sin importar la cobertura
 
-  // ── PASO 9: Seleccionar tipo de documento "DNI" ───────────────
-  setProgreso(10, 'Seleccionando tipo de documento DNI...', '🪪');
-  console.log('📌 Paso 9: Seleccionando tipo DNI...');
+  // ── PASO 9: Seleccionar tipo de documento (DNI o RUC) ────────
+  const tipoDoc = (datos.tipoDoc || 'DNI').toUpperCase();
+  setProgreso(10, `Seleccionando tipo de documento ${tipoDoc}...`, '🪪');
+  console.log(`📌 Paso 9: Seleccionando tipo ${tipoDoc}...`);
 
   // Clic en el combobox de tipo_doc para abrir el dropdown
   await pg.waitForSelector('span[aria-controls="select2-tipo_doc-container"]', { timeout: 10000 });
   await sleep(500);
   await pg.click('span[aria-controls="select2-tipo_doc-container"]');
-  await sleep(1500); // esperar que se despliegue el dropdown con animación
+  await sleep(1500);
 
   // Esperar que aparezcan las opciones en el DOM
   await pg.waitForSelector('#select2-tipo_doc-results .select2-results__option', { visible: true, timeout: 10000 });
   await sleep(400);
   await shot(pg, '13a_dropdown_abierto');
 
-  // Log de opciones para debug
   const opcionesDNI = await pg.$$eval(
     '#select2-tipo_doc-results .select2-results__option',
     els => els.map(e => e.textContent.trim())
   );
   console.log('  📋 Opciones disponibles:', opcionesDNI);
 
-  // Buscar y hacer clic nativo de Puppeteer sobre la opción DNI
+  // Seleccionar la opción según tipoDoc (DNI o RUC)
   const optionHandles = await pg.$$('#select2-tipo_doc-results .select2-results__option');
-  let dniClicked = false;
+  let docClicked = false;
   for (const handle of optionHandles) {
     const texto = await handle.evaluate(el => el.textContent.trim());
-    if (texto === 'DNI') {
+    if (texto === tipoDoc) {
       await handle.click();
-      dniClicked = true;
-      console.log('  ✓ DNI seleccionado');
+      docClicked = true;
+      console.log(`  ✓ ${tipoDoc} seleccionado`);
       break;
     }
   }
-  if (!dniClicked) throw new Error('Opción DNI no encontrada en lista. Opciones: ' + opcionesDNI.join(', '));
+  if (!docClicked) throw new Error(`Opción ${tipoDoc} no encontrada en lista. Opciones: ` + opcionesDNI.join(', '));
 
   await sleep(1000);
   await shot(pg, '13_tipo_doc_dni');
 
-  // ── PASO 10: Ingresar número de DNI ───────────────────────────
-  setProgreso(10, `Ingresando DNI ${datos.dni}...`, '🔢');
-  console.log('📌 Paso 10: Ingresando DNI:', datos.dni);
-  if (!datos.dni) throw new Error('DNI no proporcionado para búsqueda de score');
+  // ── PASO 10: Ingresar número de documento ─────────────────────
+  setProgreso(10, `Ingresando ${tipoDoc} ${datos.dni}...`, '🔢');
+  console.log(`📌 Paso 10: Ingresando ${tipoDoc}:`, datos.dni);
+  if (!datos.dni) throw new Error(`${tipoDoc} no proporcionado para búsqueda de score`);
   await limpiarYEscribir(pg, WIN.sel.input_dni, datos.dni);
   await sleep(800);
   await shot(pg, '14_dni_ingresado');
@@ -876,7 +876,7 @@ async function ejecutarConCola(datos) {
 
 // Validar cobertura
 app.post('/validar', async (req, res) => {
-  const { dni, tipo, direccion, distrito, hhuu, via, numero, operador, operadorNombre } = req.body;
+  const { dni, tipo, tipoDoc, direccion, distrito, hhuu, via, numero, operador, operadorNombre } = req.body;
 
   if (!tipo) return res.status(400).json({ ok: false, error: 'Falta campo: tipo' });
   if (tipo === 'coords' && !direccion) return res.status(400).json({ ok: false, error: 'Falta coordenadas' });
@@ -894,7 +894,7 @@ app.post('/validar', async (req, res) => {
   if (posicion > 0) console.log(`  ⏳ En cola — posición #${posicion}`);
   console.log(`${'═'.repeat(50)}`);
 
-  const datos = { dni, tipo, direccion, distrito, hhuu, via, numero, operador, operadorNombre };
+  const datos = { dni, tipo, tipoDoc, direccion, distrito, hhuu, via, numero, operador, operadorNombre };
 
   try {
     const resultado = await ejecutarConCola(datos);
