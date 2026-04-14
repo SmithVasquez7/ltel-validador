@@ -309,15 +309,24 @@ async function doLogin(pg) {
 }
 
 // Detecta si WIN cerró la sesión y re-ingresa automáticamente
+// Refresca la página primero para verificar si la sesión sigue activa
 async function checkSesionWIN(pg) {
+  console.log('🔄 Refrescando página para verificar sesión WIN...');
+  try {
+    await pg.reload({ waitUntil: 'domcontentloaded', timeout: 20000 });
+  } catch(_) {
+    console.warn('  ⚠ Reload tardó demasiado, continuando...');
+  }
+  await sleep(1500);
   const url = pg.url();
   const enLogin = url.includes('/login') || url.includes('accounts.google.com');
   if (enLogin) {
-    console.log('⚠ Sesión WIN expirada. Re-ingresando automáticamente...');
+    console.log('⚠ Sesión WIN expirada tras refresco. Re-ingresando...');
     loggedIn = false;
     await doLogin(pg);
     return true;
   }
+  console.log('  ✓ Sesión WIN activa tras refresco. Continuando...');
   return false;
 }
 
