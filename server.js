@@ -47,6 +47,10 @@ const WIN = {
     input_hhuu:      '#gf_hhuu',
     input_via:       '#gf_via',
     input_numero:    '#gf_numero',
+    input_cruce:     '#gf_cruce',
+    input_manzana:   '#gf_manzana',
+    input_lote:      '#gf_lote',
+    input_km:        '#gf_km',
 
     // ── Formulario Coordenadas ──
     input_lat:  '#gf_lat',
@@ -451,7 +455,14 @@ async function ejecutarValidacion(datos) {
 
     // Número (sin autocomplete, solo escribir)
     await limpiarYEscribir(pg, WIN.sel.input_numero, datos.numero || '');
-    await sleep(1000);
+    await sleep(800);
+
+    // Campos opcionales
+    if (datos.cruce)   { await limpiarYEscribir(pg, WIN.sel.input_cruce,   datos.cruce);   await sleep(800); }
+    if (datos.manzana) { await limpiarYEscribir(pg, WIN.sel.input_manzana, datos.manzana); await sleep(800); }
+    if (datos.lote)    { await limpiarYEscribir(pg, WIN.sel.input_lote,    datos.lote);    await sleep(800); }
+    if (datos.km)      { await limpiarYEscribir(pg, WIN.sel.input_km,      datos.km);      await sleep(800); }
+
     await shot(pg, '06_calle_filled');
   }
 
@@ -876,7 +887,7 @@ async function ejecutarConCola(datos) {
 
 // Validar cobertura
 app.post('/validar', async (req, res) => {
-  const { dni, tipo, tipoDoc, direccion, distrito, hhuu, via, numero, operador, operadorNombre } = req.body;
+  const { dni, tipo, tipoDoc, direccion, distrito, hhuu, via, numero, cruce, manzana, lote, km, operador, operadorNombre } = req.body;
 
   if (!tipo) return res.status(400).json({ ok: false, error: 'Falta campo: tipo' });
   if (tipo === 'coords' && !direccion) return res.status(400).json({ ok: false, error: 'Falta coordenadas' });
@@ -894,7 +905,7 @@ app.post('/validar', async (req, res) => {
   if (posicion > 0) console.log(`  ⏳ En cola — posición #${posicion}`);
   console.log(`${'═'.repeat(50)}`);
 
-  const datos = { dni, tipo, tipoDoc, direccion, distrito, hhuu, via, numero, operador, operadorNombre };
+  const datos = { dni, tipo, tipoDoc, direccion, distrito, hhuu, via, numero, cruce, manzana, lote, km, operador, operadorNombre };
 
   try {
     const resultado = await ejecutarConCola(datos);

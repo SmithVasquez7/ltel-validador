@@ -526,6 +526,38 @@ tr:hover td{background:rgba(255,255,255,.02)}
             </div>
           </div>
 
+          <div class="form-group" id="field-cruce">
+            <label class="form-label">Cruce con calle <span style="color:var(--text-muted);font-weight:400">(opcional)</span></label>
+            <div class="form-input-wrap">
+              <i class="fas fa-code-branch form-icon"></i>
+              <input type="text" id="cruce" class="form-input" placeholder="Ej: Av. Los Olivos">
+            </div>
+          </div>
+
+          <div class="form-group" id="field-manzana">
+            <label class="form-label">Manzana <span style="color:var(--text-muted);font-weight:400">(opcional)</span></label>
+            <div class="form-input-wrap">
+              <i class="fas fa-th-large form-icon"></i>
+              <input type="text" id="manzana" class="form-input" placeholder="Ej: A">
+            </div>
+          </div>
+
+          <div class="form-group" id="field-lote">
+            <label class="form-label">Lote <span style="color:var(--text-muted);font-weight:400">(opcional)</span></label>
+            <div class="form-input-wrap">
+              <i class="fas fa-map-pin form-icon"></i>
+              <input type="text" id="lote" class="form-input" placeholder="Ej: 5">
+            </div>
+          </div>
+
+          <div class="form-group" id="field-km">
+            <label class="form-label">KM <span style="color:var(--text-muted);font-weight:400">(opcional)</span></label>
+            <div class="form-input-wrap">
+              <i class="fas fa-ruler form-icon"></i>
+              <input type="text" id="km" class="form-input" placeholder="Ej: 12">
+            </div>
+          </div>
+
           <!-- Coordenadas -->
           <div class="form-group" id="field-lat" style="display:none">
             <label class="form-label">Latitud</label>
@@ -743,6 +775,10 @@ document.getElementById('validForm').addEventListener('submit',async(e)=>{
   const hhuu     = document.getElementById('hhuu').value.trim();
   const via      = document.getElementById('via').value.trim();
   const numero   = document.getElementById('numero').value.trim();
+  const cruce    = document.getElementById('cruce').value.trim();
+  const manzana  = document.getElementById('manzana').value.trim();
+  const lote     = document.getElementById('lote').value.trim();
+  const km       = document.getElementById('km').value.trim();
   const latitud  = document.getElementById('latitud').value.trim();
   const longitud = document.getElementById('longitud').value.trim();
 
@@ -850,7 +886,7 @@ document.getElementById('validForm').addEventListener('submit',async(e)=>{
       body:JSON.stringify({
         dni, tipo:tipoActual, tipoDoc: tipoDocActual,
         // calle
-        distrito, hhuu, via, numero,
+        distrito, hhuu, via, numero, cruce, manzana, lote, km,
         // coords
         direccion: tipoActual==='coords' ? `${latitud},${longitud}` : '',
         // trabajador
