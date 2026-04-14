@@ -519,7 +519,7 @@ tr:hover td{background:rgba(255,255,255,.02)}
           </div>
 
           <div class="form-group" id="field-numero">
-            <label class="form-label">Número</label>
+            <label class="form-label">Número <span style="color:var(--text-muted);font-weight:400">(opcional)</span></label>
             <div class="form-input-wrap">
               <i class="fas fa-hashtag form-icon"></i>
               <input type="text" id="numero" class="form-input" placeholder="Ej: 165">
@@ -672,7 +672,7 @@ function setTipo(t){
   // Required
   document.getElementById('distrito').required=t==='calle';
   document.getElementById('via').required=t==='calle';
-  document.getElementById('numero').required=t==='calle';
+  document.getElementById('numero').required=false;
   document.getElementById('latitud').required=t==='coords';
   document.getElementById('longitud').required=t==='coords';
 }
