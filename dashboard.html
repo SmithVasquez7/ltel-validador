@@ -354,9 +354,6 @@ tr:hover td{background:rgba(255,255,255,.02)}
       <button id="btn-server-url" onclick="abrirModalServerURL()" style="background:rgba(99,102,241,.12);border:1px solid rgba(99,102,241,.3);border-radius:8px;color:#a5b4fc;font-size:.78rem;padding:.4rem .85rem;cursor:pointer;font-family:'Inter',sans-serif;transition:all .2s" title="Configurar URL del servidor">
         <i class="fas fa-server"></i> <span id="lbl-server-url">Servidor URL</span>
       </button>
-      <button onclick="document.getElementById('modal-creds').style.display='flex'" style="background:rgba(255,255,255,.06);border:1px solid var(--border);border-radius:8px;color:var(--text-secondary);font-size:.78rem;padding:.4rem .85rem;cursor:pointer;font-family:'Inter',sans-serif;transition:all .2s" onmouseover="this.style.color='#fff'" onmouseout="this.style.color='var(--text-secondary)'">
-        <i class="fas fa-key"></i> Credenciales WIN
-      </button>
     </div>
   </div>
 
@@ -661,7 +658,7 @@ function setTipo(t){
   document.getElementById('type-calle').classList.toggle('active',t==='calle');
   document.getElementById('type-coords').classList.toggle('active',t==='coords');
   // Campos calle
-  ['field-hhuu','field-via','field-numero'].forEach(id=>{
+  ['field-hhuu','field-via','field-numero','field-cruce','field-manzana','field-lote','field-km'].forEach(id=>{
     document.getElementById(id).style.display=t==='calle'?'flex':'none';
   });
   // Campos coords
@@ -960,11 +957,16 @@ document.getElementById('validForm').addEventListener('submit',async(e)=>{
     }
   }catch(err){
     esExito = false;
-    showResult('error','Servidor no disponible',
-      'Verifica que el servidor esté corriendo: node server.js',[
-      {label:'DNI',val:dni},{label:'Dirección',val:direccionResumen},
-      {label:'Error',val:err.message},
-    ]);
+    const esConexion = err.name==='TypeError' || err.message.toLowerCase().includes('failed to fetch')
+                    || err.message.toLowerCase().includes('network') || err.name==='AbortError';
+    if(esConexion){
+      showResult('error','⚠ Servidor apagado',
+        'El servidor de automatización está apagado en este momento. Contacta al administrador TI para su verificación.',[]);
+    } else {
+      showResult('error','Error en el servidor',err.message||'Error desconocido',[
+        {label:'DNI',val:dni},{label:'Dirección',val:direccionResumen},
+      ]);
+    }
   }
 
   clearInterval(progresoInterval);
