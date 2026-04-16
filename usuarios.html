@@ -7,120 +7,50 @@
 <title>L-TEL | Gestión de Usuarios</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<link rel="stylesheet" href="css/shared.css">
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+<script src="js/shared.js"></script>
 <style>
-*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
-:root{
-  --primary:#0ea5e9;--primary-dark:#0284c7;--primary-light:#38bdf8;
-  --accent:#06b6d4;--sidebar-w:260px;
-  --dark:#0a1628;--bg:#0f1e35;--bg-card:rgba(255,255,255,0.04);
-  --text:#fff;--text-secondary:#94a3b8;--text-muted:#475569;
-  --border:rgba(255,255,255,0.07);--border-hover:rgba(14,165,233,0.35);
-  --danger:#ef4444;--success:#22c55e;--warning:#f59e0b;--purple:#8b5cf6;
-  --radius:10px;--radius-lg:14px;
-}
-html{scroll-behavior:smooth}
-body{font-family:'Inter',sans-serif;background:var(--dark);color:var(--text);min-height:100vh;display:flex;-webkit-font-smoothing:antialiased}
-::-webkit-scrollbar{width:5px}
-::-webkit-scrollbar-thumb{background:rgba(14,165,233,.25);border-radius:10px}
-.sidebar{width:var(--sidebar-w);min-height:100vh;background:rgba(10,22,40,0.97);border-right:1px solid var(--border);display:flex;flex-direction:column;position:fixed;top:0;left:0;z-index:100}
-.sidebar-header{padding:1.5rem 1.25rem 1rem;border-bottom:1px solid var(--border)}
-.sidebar-logo{display:flex;align-items:center;gap:.85rem}
-.sidebar-logo-img{width:42px;height:42px;border-radius:10px;overflow:hidden;background:#fff;border:1px solid rgba(14,165,233,.2);flex-shrink:0}
-.sidebar-logo-img img{width:100%;height:100%;object-fit:contain;padding:4px}
-.sidebar-logo-text strong{font-size:.95rem;font-weight:700;color:#fff;display:block}
-.sidebar-logo-text span{font-size:.68rem;color:var(--text-secondary)}
-.sidebar-nav{flex:1;padding:1rem 0;overflow-y:auto}
-.nav-section{padding:.5rem 1.25rem .25rem;font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--text-muted)}
-.nav-link{display:flex;align-items:center;gap:.75rem;padding:.65rem 1.25rem;font-size:.85rem;font-weight:500;color:var(--text-secondary);text-decoration:none;transition:all .18s;border-left:3px solid transparent;cursor:pointer}
-.nav-link:hover{color:#fff;background:rgba(255,255,255,.04)}
-.nav-link.active{color:var(--primary-light);background:rgba(14,165,233,.08);border-left-color:var(--primary)}
-.nav-link i{width:18px;text-align:center;font-size:.9rem}
-.sidebar-footer{padding:1rem 1.25rem;border-top:1px solid var(--border)}
-.user-info{display:flex;align-items:center;gap:.75rem;margin-bottom:.85rem}
-.user-avatar{width:36px;height:36px;background:linear-gradient(135deg,var(--primary),var(--accent));border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:.85rem;flex-shrink:0}
-.user-name{font-size:.85rem;font-weight:600}
-.user-role{font-size:.7rem;color:var(--text-secondary);margin-top:.1rem}
-.btn-logout{width:100%;padding:.55rem;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.2);border-radius:var(--radius);color:#fca5a5;font-size:.8rem;font-weight:500;cursor:pointer;transition:all .2s;display:flex;align-items:center;justify-content:center;gap:.5rem;font-family:'Inter',sans-serif}
-.btn-logout:hover{background:rgba(239,68,68,.2)}
-.main{margin-left:var(--sidebar-w);flex:1;display:flex;flex-direction:column;min-height:100vh}
-.topbar{height:64px;background:rgba(10,22,40,.9);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:0 2rem;position:sticky;top:0;z-index:50}
-.topbar-title{font-size:1.05rem;font-weight:700}
-.content{flex:1;padding:2rem;max-width:1100px;width:100%}
-.card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;margin-bottom:1.5rem}
-.card-header{display:flex;align-items:center;justify-content:space-between;padding:1.25rem 1.5rem;border-bottom:1px solid var(--border)}
-.card-title{font-size:.95rem;font-weight:700}
-.btn{padding:.7rem 1.4rem;border-radius:var(--radius);font-family:'Inter',sans-serif;font-size:.85rem;font-weight:600;cursor:pointer;transition:all .2s;display:inline-flex;align-items:center;gap:.45rem;border:none}
-.btn-primary{background:linear-gradient(135deg,var(--primary),var(--primary-dark));color:#fff;box-shadow:0 4px 14px rgba(14,165,233,.25)}
-.btn-primary:hover{transform:translateY(-1px);box-shadow:0 6px 20px rgba(14,165,233,.4)}
-.btn-danger{background:rgba(239,68,68,.12);color:#fca5a5;border:1px solid rgba(239,68,68,.25)}
-.btn-danger:hover{background:rgba(239,68,68,.22)}
-.btn-sm{padding:.4rem .85rem;font-size:.78rem}
-table{width:100%;border-collapse:collapse}
-thead tr{background:rgba(255,255,255,.03)}
-th{padding:.75rem 1rem;font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text-muted);text-align:left;white-space:nowrap}
-td{padding:.85rem 1rem;font-size:.83rem;color:var(--text-secondary);border-top:1px solid var(--border);vertical-align:middle}
-tr:hover td{background:rgba(255,255,255,.02)}
-.badge{display:inline-flex;align-items:center;gap:.3rem;padding:.2rem .7rem;border-radius:50px;font-size:.7rem;font-weight:600}
-.badge-success{background:rgba(34,197,94,.12);color:#86efac;border:1px solid rgba(34,197,94,.2)}
-.badge-error{background:rgba(239,68,68,.12);color:#fca5a5;border:1px solid rgba(239,68,68,.2)}
-.badge-purple{background:rgba(139,92,246,.12);color:#c4b5fd;border:1px solid rgba(139,92,246,.2)}
-.badge-blue{background:rgba(14,165,233,.12);color:#7dd3fc;border:1px solid rgba(14,165,233,.2)}
-.empty-state{text-align:center;padding:3rem 2rem;color:var(--text-muted)}
-.empty-state i{font-size:2rem;margin-bottom:.75rem;display:block}
-/* Modal */
-.modal-overlay{display:none;position:fixed;inset:0;z-index:200;background:rgba(0,0,0,.75);backdrop-filter:blur(8px);align-items:center;justify-content:center;padding:1rem}
-.modal-box{background:#0f1e35;border:1px solid rgba(255,255,255,.1);border-radius:16px;padding:2rem;width:100%;max-width:480px;box-shadow:0 30px 60px rgba(0,0,0,.6);max-height:90vh;overflow-y:auto}
-.modal-title{font-size:1rem;font-weight:700;margin-bottom:1.5rem;display:flex;align-items:center;gap:.6rem}
-.form-group{margin-bottom:1rem}
-.form-label{display:block;font-size:.78rem;font-weight:600;color:rgba(255,255,255,.65);margin-bottom:.4rem}
-.form-input{width:100%;padding:.8rem 1rem;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);border-radius:10px;color:#fff;font-family:'Inter',sans-serif;font-size:.88rem;outline:none;transition:all .2s}
-.form-input:focus{border-color:var(--primary);background:rgba(14,165,233,.06);box-shadow:0 0 0 3px rgba(14,165,233,.1)}
-.form-select{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%2394a3b8' d='M6 8L1 3h10z'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;padding-right:2rem;cursor:pointer}
+/* Page-specific */
+.stats-row{grid-template-columns:repeat(4,1fr)}
 .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:1rem}
 .form-actions{display:flex;gap:.75rem;margin-top:1.5rem;padding-top:1.25rem;border-top:1px solid var(--border)}
-.stats-row{display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;margin-bottom:1.5rem}
-.stat-card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-lg);padding:1.1rem 1.25rem;display:flex;align-items:center;gap:.85rem}
-.stat-icon{width:40px;height:40px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:1rem;flex-shrink:0}
-.stat-label{font-size:.72rem;color:var(--text-secondary);margin-bottom:.15rem}
-.stat-val{font-size:1.4rem;font-weight:800;line-height:1}
-@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
 </style>
 </head>
 <body>
 
 <!-- MODAL USUARIO -->
 <div class="modal-overlay" id="modal-usuario" onclick="if(event.target===this)cerrarModal()">
-  <div class="modal-box">
+  <div class="modal-box" style="max-width:480px">
     <div class="modal-title"><i class="fas fa-user-plus" style="color:var(--primary-light)"></i><span id="modal-titulo">Nuevo Trabajador</span></div>
     <div class="form-grid">
       <div class="form-group">
         <label class="form-label">Nombre Completo *</label>
-        <input type="text" id="f-nombre" class="form-input" placeholder="Ej: Juan Pérez">
+        <input type="text" id="f-nombre" class="form-input" style="padding-left:1rem" placeholder="Ej: Juan Pérez">
       </div>
       <div class="form-group">
         <label class="form-label">Usuario (login) *</label>
-        <input type="text" id="f-usuario" class="form-input" placeholder="Ej: jperez">
+        <input type="text" id="f-usuario" class="form-input" style="padding-left:1rem" placeholder="Ej: jperez">
       </div>
       <div class="form-group">
         <label class="form-label">Contraseña *</label>
-        <input type="password" id="f-password" class="form-input" placeholder="Mínimo 6 caracteres">
+        <input type="password" id="f-password" class="form-input" style="padding-left:1rem" placeholder="Mínimo 6 caracteres">
       </div>
       <div class="form-group">
         <label class="form-label">Teléfono</label>
-        <input type="text" id="f-telefono" class="form-input" placeholder="Ej: 987654321">
+        <input type="text" id="f-telefono" class="form-input" style="padding-left:1rem" placeholder="Ej: 987654321">
       </div>
       <div class="form-group">
         <label class="form-label">Rol *</label>
-        <select id="f-rol" class="form-input form-select">
+        <select id="f-rol" class="form-input form-select" style="padding-left:1rem">
           <option value="operador">Operador</option>
           <option value="admin">Administrador</option>
         </select>
       </div>
       <div class="form-group">
         <label class="form-label">Estado *</label>
-        <select id="f-activo" class="form-input form-select">
+        <select id="f-activo" class="form-input form-select" style="padding-left:1rem">
           <option value="true">Activo</option>
           <option value="false">Inactivo</option>
         </select>
@@ -128,17 +58,20 @@ tr:hover td{background:rgba(255,255,255,.02)}
     </div>
     <div class="form-group" style="grid-column:1/-1">
       <label class="form-label">Correo electrónico</label>
-      <input type="email" id="f-email" class="form-input" placeholder="Ej: juan@empresa.com">
+      <input type="email" id="f-email" class="form-input" style="padding-left:1rem" placeholder="Ej: juan@empresa.com">
     </div>
     <div class="form-actions">
       <button class="btn btn-primary" onclick="guardarUsuario()" id="btn-guardar"><i class="fas fa-save"></i> Guardar</button>
-      <button class="btn" style="background:rgba(255,255,255,.06);border:1px solid var(--border);color:var(--text-secondary)" onclick="cerrarModal()">Cancelar</button>
+      <button class="btn btn-secondary" onclick="cerrarModal()">Cancelar</button>
     </div>
   </div>
 </div>
 
+<!-- Sidebar overlay (mobile) -->
+<div class="sidebar-overlay" id="sidebar-overlay" onclick="closeSidebar()"></div>
+
 <!-- SIDEBAR -->
-<aside class="sidebar">
+<aside class="sidebar" id="sidebar">
   <div class="sidebar-header">
     <div class="sidebar-logo">
       <div class="sidebar-logo-img"><img src="../assets/icons/ltel.jpeg" alt="L-TEL"></div>
@@ -162,16 +95,26 @@ tr:hover td{background:rgba(255,255,255,.02)}
   </div>
 </aside>
 
+<!-- Mobile topbar -->
+<div class="mobile-topbar">
+  <button class="hamburger" onclick="openSidebar()"><i class="fas fa-bars"></i></button>
+  <div style="display:flex;align-items:center;gap:.6rem">
+    <img src="../assets/icons/ltel.jpeg" style="width:28px;height:28px;border-radius:6px;object-fit:contain;background:#fff;padding:2px" alt="L-TEL">
+    <span style="font-weight:700;font-size:.9rem;color:#fff">Usuarios</span>
+  </div>
+  <div style="width:40px"></div>
+</div>
+
 <main class="main">
   <div class="topbar">
     <div class="topbar-title"><i class="fas fa-users" style="color:var(--primary-light);margin-right:.5rem"></i>Gestión de Trabajadores</div>
     <button class="btn btn-primary" onclick="abrirModalNuevo()"><i class="fas fa-user-plus"></i> Nuevo Trabajador</button>
   </div>
 
-  <div class="content">
+  <div class="content" style="max-width:1100px">
 
     <!-- Stats -->
-    <div class="stats-row" id="stats-row">
+    <div class="stats-row">
       <div class="stat-card">
         <div class="stat-icon" style="background:rgba(14,165,233,.15);color:var(--primary-light)"><i class="fas fa-users"></i></div>
         <div><div class="stat-label">Total usuarios</div><div class="stat-val" id="stat-total">0</div></div>
@@ -193,9 +136,9 @@ tr:hover td{background:rgba(255,255,255,.02)}
     <!-- Tabla usuarios -->
     <div class="card">
       <div class="card-header">
-        <div class="card-title"><i class="fas fa-list" style="color:var(--primary-light);margin-right:.5rem"></i>Lista de Trabajadores</div>
+        <div class="card-title"><i class="fas fa-list"></i>Lista de Trabajadores</div>
         <div style="display:flex;gap:.5rem;align-items:center">
-          <input type="text" id="buscador" placeholder="Buscar..." oninput="filtrarTabla()" style="padding:.45rem .9rem;background:rgba(255,255,255,.05);border:1px solid var(--border);border-radius:8px;color:#fff;font-size:.82rem;outline:none;font-family:'Inter',sans-serif;width:180px">
+          <input type="text" id="buscador" placeholder="Buscar..." oninput="filtrarTabla()" class="filter-input" style="width:180px">
         </div>
       </div>
       <div style="overflow-x:auto">
@@ -223,217 +166,195 @@ tr:hover td{background:rgba(255,255,255,.02)}
 </main>
 
 <script>
-const firebaseConfig={
-  apiKey:"AIzaSyDre3Wdt__AKKP2NGiv-I5ksqscoVPDsho",
-  authDomain:"softkes-ssi.firebaseapp.com",
-  projectId:"softkes-ssi",
-  storageBucket:"softkes-ssi.firebasestorage.app",
-  messagingSenderId:"949401432052",
-  appId:"1:949401432052:web:131984f96192cf9ff493a1"
-};
-if(!firebase.apps.length) firebase.initializeApp(firebaseConfig);
-const db = firebase.firestore();
+var session = requireAuth('admin');
+if (session) {
+  initSidebarUser(session);
 
-// Auth
-const _sess = sessionStorage.getItem('validadorUser');
-if(!_sess){ window.location.href='login.html'; }
-const session = JSON.parse(_sess);
-if(session.rol !== 'admin'){ window.location.href='dashboard.html'; }
+  var todosUsuarios = [];
+  var validacionesPorUsuario = {};
+  var editId = null;
 
-document.getElementById('user-name').textContent   = session.nombre||session.usuario;
-document.getElementById('user-role').textContent   = 'Administrador';
-document.getElementById('user-avatar').textContent = (session.nombre||session.usuario).charAt(0).toUpperCase();
-document.getElementById('link-admin').style.display = 'flex';
+  async function cargarValidacionesPorUsuario() {
+    try {
+      var snap = await db.collection('validacionesWIN').get();
+      validacionesPorUsuario = {};
+      snap.forEach(function(doc) {
+        var op = doc.data().operador || '';
+        validacionesPorUsuario[op] = (validacionesPorUsuario[op] || 0) + 1;
+      });
+    } catch(e) { console.warn('No se pudieron cargar validaciones:', e.message); }
+  }
 
-function logout(){ sessionStorage.removeItem('validadorUser'); window.location.href='login.html'; }
+  async function cargarUsuarios() {
+    try {
+      await cargarValidacionesPorUsuario();
+      var snap = await db.collection('validador_usuarios').orderBy('nombre').get();
+      todosUsuarios = snap.docs.map(function(d) { return Object.assign({ id: d.id }, d.data()); });
+      renderTabla(todosUsuarios);
+      actualizarStats(todosUsuarios);
+    } catch(e) {
+      document.getElementById('tabla-body').innerHTML =
+        '<tr><td colspan="8"><div class="empty-state"><i class="fas fa-exclamation-triangle"></i>Error al cargar: '+escHtml(e.message)+'</div></td></tr>';
+    }
+  }
 
-// ── Datos en memoria para búsqueda ──
-let todosUsuarios = [];
-let validacionesPorUsuario = {}; // { usuario: count }
-let editId = null;
+  function actualizarStats(lista) {
+    document.getElementById('stat-total').textContent    = lista.length;
+    document.getElementById('stat-activos').textContent  = lista.filter(function(u){ return u.activo!==false; }).length;
+    document.getElementById('stat-inactivos').textContent= lista.filter(function(u){ return u.activo===false; }).length;
+    document.getElementById('stat-admins').textContent   = lista.filter(function(u){ return u.rol==='admin'; }).length;
+  }
 
-// ── Cargar stats de validaciones por trabajador ──
-async function cargarValidacionesPorUsuario() {
-  try {
-    const snap = await db.collection('validacionesWIN').get();
-    validacionesPorUsuario = {};
-    snap.forEach(doc => {
-      const op = doc.data().operador || '';
-      validacionesPorUsuario[op] = (validacionesPorUsuario[op] || 0) + 1;
+  function renderTabla(lista) {
+    var tbody = document.getElementById('tabla-body');
+    if (!lista.length) {
+      tbody.innerHTML='<tr><td colspan="8"><div class="empty-state"><i class="fas fa-users"></i>No hay usuarios registrados</div></td></tr>';
+      return;
+    }
+    tbody.innerHTML = '';
+    lista.forEach(function(u) {
+      var activo  = u.activo !== false;
+      var esAdmin = u.rol === 'admin';
+      var count   = validacionesPorUsuario[u.usuario] || 0;
+      var tr = document.createElement('tr');
+      tr.innerHTML =
+        '<td style="font-weight:600;color:#fff">'+escHtml(u.nombre||'—')+'</td>'+
+        '<td><code style="background:rgba(255,255,255,.06);padding:.15rem .5rem;border-radius:5px;font-size:.78rem">'+escHtml(u.usuario||'—')+'</code></td>'+
+        '<td>'+escHtml(u.email||'—')+'</td>'+
+        '<td>'+escHtml(u.telefono||'—')+'</td>'+
+        '<td>'+(esAdmin?'<span class="badge badge-purple"><i class="fas fa-crown"></i> Admin</span>':'<span class="badge badge-blue"><i class="fas fa-user"></i> Operador</span>')+'</td>'+
+        '<td>'+(activo?'<span class="badge badge-success"><i class="fas fa-circle"></i> Activo</span>':'<span class="badge badge-error"><i class="fas fa-circle"></i> Inactivo</span>')+'</td>'+
+        '<td style="font-weight:700;color:var(--primary-light)">'+count+'</td>'+
+        '<td><div style="display:flex;gap:.4rem">'+
+          '<button class="btn btn-sm" onclick="abrirModalEditar(\''+u.id+'\')" style="background:rgba(14,165,233,.12);color:#7dd3fc;border:1px solid rgba(14,165,233,.2)"><i class="fas fa-edit"></i> Editar</button>'+
+          (u.id !== session.id ? '<button class="btn btn-sm btn-danger" onclick="eliminarUsuario(\''+u.id+'\',\''+escHtml(u.nombre||u.usuario)+'\')"><i class="fas fa-trash"></i></button>' : '<span style="font-size:.7rem;color:var(--text-muted)">Tú</span>')+
+        '</div></td>';
+      tbody.appendChild(tr);
     });
-  } catch(e) { console.warn('No se pudieron cargar validaciones:', e.message); }
-}
-
-// ── Cargar usuarios ──
-async function cargarUsuarios() {
-  try {
-    await cargarValidacionesPorUsuario();
-    const snap = await db.collection('validador_usuarios').orderBy('nombre').get();
-    todosUsuarios = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-    renderTabla(todosUsuarios);
-    actualizarStats(todosUsuarios);
-  } catch(e) {
-    document.getElementById('tabla-body').innerHTML =
-      `<tr><td colspan="8"><div class="empty-state"><i class="fas fa-exclamation-triangle"></i>Error al cargar: ${e.message}</div></td></tr>`;
   }
-}
 
-function actualizarStats(lista) {
-  document.getElementById('stat-total').textContent    = lista.length;
-  document.getElementById('stat-activos').textContent  = lista.filter(u=>u.activo!==false).length;
-  document.getElementById('stat-inactivos').textContent= lista.filter(u=>u.activo===false).length;
-  document.getElementById('stat-admins').textContent   = lista.filter(u=>u.rol==='admin').length;
-}
-
-function renderTabla(lista) {
-  const tbody = document.getElementById('tabla-body');
-  if(!lista.length){
-    tbody.innerHTML='<tr><td colspan="8"><div class="empty-state"><i class="fas fa-users"></i>No hay usuarios registrados</div></td></tr>';
-    return;
+  function filtrarTabla() {
+    var q = document.getElementById('buscador').value.toLowerCase();
+    var filtrado = todosUsuarios.filter(function(u) {
+      return (u.nombre||'').toLowerCase().includes(q) ||
+             (u.usuario||'').toLowerCase().includes(q) ||
+             (u.email||'').toLowerCase().includes(q);
+    });
+    renderTabla(filtrado);
   }
-  tbody.innerHTML = '';
-  lista.forEach(u => {
-    const activo  = u.activo !== false;
-    const esAdmin = u.rol === 'admin';
-    const count   = validacionesPorUsuario[u.usuario] || 0;
-    const tr = document.createElement('tr');
-    tr.innerHTML = `
-      <td style="font-weight:600;color:#fff">${esc(u.nombre||'—')}</td>
-      <td><code style="background:rgba(255,255,255,.06);padding:.15rem .5rem;border-radius:5px;font-size:.78rem">${esc(u.usuario||'—')}</code></td>
-      <td>${esc(u.email||'—')}</td>
-      <td>${esc(u.telefono||'—')}</td>
-      <td>${esAdmin
-        ? '<span class="badge badge-purple"><i class="fas fa-crown"></i> Admin</span>'
-        : '<span class="badge badge-blue"><i class="fas fa-user"></i> Operador</span>'}</td>
-      <td>${activo
-        ? '<span class="badge badge-success"><i class="fas fa-circle"></i> Activo</span>'
-        : '<span class="badge badge-error"><i class="fas fa-circle"></i> Inactivo</span>'}</td>
-      <td style="font-weight:700;color:var(--primary-light)">${count}</td>
-      <td>
-        <div style="display:flex;gap:.4rem">
-          <button class="btn btn-sm" onclick="abrirModalEditar('${u.id}')"
-            style="background:rgba(14,165,233,.12);color:#7dd3fc;border:1px solid rgba(14,165,233,.2)">
-            <i class="fas fa-edit"></i> Editar
-          </button>
-          ${u.id !== session.id ? `<button class="btn btn-sm btn-danger" onclick="eliminarUsuario('${u.id}','${esc(u.nombre||u.usuario)}')">
-            <i class="fas fa-trash"></i>
-          </button>` : '<span style="font-size:.7rem;color:var(--text-muted)">Tú</span>'}
-        </div>
-      </td>`;
-    tbody.appendChild(tr);
-  });
-}
 
-function filtrarTabla() {
-  const q = document.getElementById('buscador').value.toLowerCase();
-  const filtrado = todosUsuarios.filter(u =>
-    (u.nombre||'').toLowerCase().includes(q) ||
-    (u.usuario||'').toLowerCase().includes(q) ||
-    (u.email||'').toLowerCase().includes(q)
-  );
-  renderTabla(filtrado);
-}
+  // ── Modal ──
+  window.abrirModalNuevo = function() {
+    editId = null;
+    document.getElementById('modal-titulo').textContent = 'Nuevo Trabajador';
+    document.getElementById('btn-guardar').innerHTML = '<i class="fas fa-save"></i> Guardar';
+    limpiarFormulario();
+    document.getElementById('f-password').required = true;
+    document.getElementById('f-password').placeholder = 'Mínimo 6 caracteres';
+    document.getElementById('modal-usuario').style.display = 'flex';
+  };
 
-// ── Modal ──
-function abrirModalNuevo() {
-  editId = null;
-  document.getElementById('modal-titulo').textContent = 'Nuevo Trabajador';
-  document.getElementById('btn-guardar').innerHTML = '<i class="fas fa-save"></i> Guardar';
-  limpiarFormulario();
-  document.getElementById('f-password').required = true;
-  document.getElementById('f-password').placeholder = 'Mínimo 6 caracteres';
-  document.getElementById('modal-usuario').style.display = 'flex';
-}
+  window.abrirModalEditar = function(id) {
+    var u = todosUsuarios.find(function(x) { return x.id === id; });
+    if (!u) return;
+    editId = id;
+    document.getElementById('modal-titulo').textContent = 'Editar Trabajador';
+    document.getElementById('btn-guardar').innerHTML = '<i class="fas fa-save"></i> Actualizar';
+    document.getElementById('f-nombre').value   = u.nombre   || '';
+    document.getElementById('f-usuario').value  = u.usuario  || '';
+    document.getElementById('f-password').value = '';
+    document.getElementById('f-password').placeholder = 'Dejar vacío para no cambiar';
+    document.getElementById('f-password').required = false;
+    document.getElementById('f-email').value    = u.email    || '';
+    document.getElementById('f-telefono').value = u.telefono || '';
+    document.getElementById('f-rol').value      = u.rol      || 'operador';
+    document.getElementById('f-activo').value   = u.activo === false ? 'false' : 'true';
+    document.getElementById('modal-usuario').style.display = 'flex';
+  };
 
-function abrirModalEditar(id) {
-  const u = todosUsuarios.find(x => x.id === id);
-  if(!u) return;
-  editId = id;
-  document.getElementById('modal-titulo').textContent = 'Editar Trabajador';
-  document.getElementById('btn-guardar').innerHTML = '<i class="fas fa-save"></i> Actualizar';
-  document.getElementById('f-nombre').value   = u.nombre   || '';
-  document.getElementById('f-usuario').value  = u.usuario  || '';
-  document.getElementById('f-password').value = '';
-  document.getElementById('f-password').placeholder = 'Dejar vacío para no cambiar';
-  document.getElementById('f-password').required = false;
-  document.getElementById('f-email').value    = u.email    || '';
-  document.getElementById('f-telefono').value = u.telefono || '';
-  document.getElementById('f-rol').value      = u.rol      || 'operador';
-  document.getElementById('f-activo').value   = u.activo === false ? 'false' : 'true';
-  document.getElementById('modal-usuario').style.display = 'flex';
-}
+  window.cerrarModal = function() {
+    document.getElementById('modal-usuario').style.display = 'none';
+    limpiarFormulario();
+  };
 
-function cerrarModal() {
-  document.getElementById('modal-usuario').style.display = 'none';
-  limpiarFormulario();
-}
+  function limpiarFormulario() {
+    ['f-nombre','f-usuario','f-password','f-email','f-telefono'].forEach(function(id) {
+      document.getElementById(id).value = '';
+    });
+    document.getElementById('f-rol').value    = 'operador';
+    document.getElementById('f-activo').value = 'true';
+  }
 
-function limpiarFormulario() {
-  ['f-nombre','f-usuario','f-password','f-email','f-telefono'].forEach(id => {
-    document.getElementById(id).value = '';
-  });
-  document.getElementById('f-rol').value    = 'operador';
-  document.getElementById('f-activo').value = 'true';
-}
+  window.guardarUsuario = async function() {
+    var nombre   = document.getElementById('f-nombre').value.trim();
+    var usuario  = document.getElementById('f-usuario').value.trim().toLowerCase();
+    var password = document.getElementById('f-password').value;
+    var email    = document.getElementById('f-email').value.trim();
+    var telefono = document.getElementById('f-telefono').value.trim();
+    var rol      = document.getElementById('f-rol').value;
+    var activo   = document.getElementById('f-activo').value === 'true';
 
-async function guardarUsuario() {
-  const nombre   = document.getElementById('f-nombre').value.trim();
-  const usuario  = document.getElementById('f-usuario').value.trim().toLowerCase();
-  const password = document.getElementById('f-password').value;
-  const email    = document.getElementById('f-email').value.trim();
-  const telefono = document.getElementById('f-telefono').value.trim();
-  const rol      = document.getElementById('f-rol').value;
-  const activo   = document.getElementById('f-activo').value === 'true';
+    if (!nombre)  return alert('El nombre es obligatorio');
+    if (!usuario) return alert('El usuario es obligatorio');
+    if (!editId && !password) return alert('La contraseña es obligatoria');
+    if (password && password.length < 6) return alert('La contraseña debe tener al menos 6 caracteres');
 
-  if(!nombre) return alert('El nombre es obligatorio');
-  if(!usuario) return alert('El usuario es obligatorio');
-  if(!editId && !password) return alert('La contraseña es obligatoria');
-  if(password && password.length < 6) return alert('La contraseña debe tener al menos 6 caracteres');
+    var btn = document.getElementById('btn-guardar');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Guardando...';
 
-  const btn = document.getElementById('btn-guardar');
-  btn.disabled = true;
-  btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Guardando...';
+    try {
+      // Verificar usuario único
+      var usuarioActual = editId ? todosUsuarios.find(function(u){ return u.id===editId; }) : null;
+      if (!editId || (usuarioActual && usuarioActual.usuario !== usuario)) {
+        var existe = await db.collection('validador_usuarios')
+          .where('usuario','==',usuario).limit(1).get();
+        if (!existe.empty) { alert('Ya existe un usuario con ese nombre de usuario'); return; }
+      }
 
-  try {
-    // Verificar que el nombre de usuario no esté repetido
-    if(!editId || todosUsuarios.find(u=>u.id===editId)?.usuario !== usuario) {
-      const existe = await db.collection('validador_usuarios')
-        .where('usuario','==',usuario).limit(1).get();
-      if(!existe.empty) { alert('Ya existe un usuario con ese nombre de usuario'); return; }
+      var datos = { nombre: nombre, usuario: usuario, email: email, telefono: telefono, rol: rol, activo: activo };
+
+      // Hashear contraseña si se proporcionó
+      if (password) {
+        var salt = generateSalt();
+        var hash = await hashPassword(password, salt);
+        datos.passwordHash   = hash;
+        datos.passwordSalt   = salt;
+        datos.passwordHashed = true;
+        // No guardar password en texto plano
+      }
+
+      if (editId) {
+        await db.collection('validador_usuarios').doc(editId).update(datos);
+        showToast('Trabajador actualizado correctamente');
+      } else {
+        datos.fechaCreacion = new Date().toISOString();
+        datos.creadoPor = session.usuario;
+        await db.collection('validador_usuarios').add(datos);
+        showToast('Trabajador creado correctamente');
+      }
+
+      cerrarModal();
+      await cargarUsuarios();
+    } catch(e) {
+      alert('Error al guardar: ' + e.message);
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = editId ? '<i class="fas fa-save"></i> Actualizar' : '<i class="fas fa-save"></i> Guardar';
     }
+  };
 
-    const datos = { nombre, usuario, email, telefono, rol, activo };
-    if(password) datos.password = password;
+  window.eliminarUsuario = async function(id, nombre) {
+    if (!confirm('¿Eliminar al trabajador "' + nombre + '"?\nEsta acción no se puede deshacer.')) return;
+    try {
+      await db.collection('validador_usuarios').doc(id).delete();
+      showToast('Trabajador eliminado');
+      await cargarUsuarios();
+    } catch(e) { alert('Error al eliminar: ' + e.message); }
+  };
 
-    if(editId) {
-      await db.collection('validador_usuarios').doc(editId).update(datos);
-    } else {
-      datos.fechaCreacion = new Date().toISOString();
-      datos.creadoPor = session.usuario;
-      await db.collection('validador_usuarios').add(datos);
-    }
-
-    cerrarModal();
-    await cargarUsuarios();
-  } catch(e) {
-    alert('Error al guardar: ' + e.message);
-  } finally {
-    btn.disabled = false;
-    btn.innerHTML = editId ? '<i class="fas fa-save"></i> Actualizar' : '<i class="fas fa-save"></i> Guardar';
-  }
+  cargarUsuarios();
 }
-
-async function eliminarUsuario(id, nombre) {
-  if(!confirm(`¿Eliminar al trabajador "${nombre}"?\nEsta acción no se puede deshacer.`)) return;
-  try {
-    await db.collection('validador_usuarios').doc(id).delete();
-    await cargarUsuarios();
-  } catch(e) { alert('Error al eliminar: ' + e.message); }
-}
-
-function esc(s){ return String(s||'').replace(/[<>&"']/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;',"'":'&#39;'}[c])); }
-
-cargarUsuarios();
 </script>
 </body>
 </html>

@@ -9,8 +9,10 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<link rel="stylesheet" href="css/shared.css">
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+<script src="js/shared.js"></script>
 <style>
 *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
 :root{
@@ -282,12 +284,12 @@ tr:hover td{background:rgba(255,255,255,.02)}
     <!-- Badge resultado -->
     <div id="modal-det-badge" style="margin-bottom:1.25rem"></div>
     <!-- Grid de datos -->
-    <div id="modal-det-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem"></div>
+    <div id="modal-det-grid" class="detail-grid"></div>
   </div>
 </div>
 
 <!-- Sidebar overlay (mobile) -->
-<div class="sidebar-overlay" id="overlay" onclick="closeSidebar()"></div>
+<div class="sidebar-overlay" id="sidebar-overlay" onclick="closeSidebar()"></div>
 
 <!-- SIDEBAR -->
 <aside class="sidebar" id="sidebar">
@@ -367,11 +369,7 @@ tr:hover td{background:rgba(255,255,255,.02)}
     </div>
 
     <!-- Alerta: credenciales WIN faltantes -->
-    <div id="alert-creds" style="display:none;align-items:center;gap:.75rem;padding:1rem 1.25rem;background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.25);border-radius:12px;margin-bottom:1.5rem;font-size:.85rem;color:#fcd34d">
-      <i class="fas fa-key" style="font-size:1.1rem;flex-shrink:0"></i>
-      <div><strong>Configura las credenciales WIN</strong> para activar la validación automática.</div>
-      <button onclick="document.getElementById('modal-creds').style.display='flex'" style="margin-left:auto;background:rgba(245,158,11,.15);border:1px solid rgba(245,158,11,.3);border-radius:8px;color:#fcd34d;font-size:.78rem;padding:.4rem .85rem;cursor:pointer;white-space:nowrap;font-family:'Inter',sans-serif">Configurar →</button>
-    </div>
+    <div id="alert-creds" style="display:none"></div>
 
     <!-- Stats -->
     <div class="stats-row" id="stats-row">
@@ -623,33 +621,10 @@ tr:hover td{background:rgba(255,255,255,.02)}
 </main>
 
 <script>
-const firebaseConfig={
-  apiKey:"AIzaSyDre3Wdt__AKKP2NGiv-I5ksqscoVPDsho",
-  authDomain:"softkes-ssi.firebaseapp.com",
-  projectId:"softkes-ssi",
-  storageBucket:"softkes-ssi.firebasestorage.app",
-  messagingSenderId:"949401432052",
-  appId:"1:949401432052:web:131984f96192cf9ff493a1"
-};
-firebase.initializeApp(firebaseConfig);
-const db=firebase.firestore();
-
-// ── Auth check ──
-const _sess=sessionStorage.getItem('validadorUser');
-if(!_sess){window.location.href='login.html';}
-const session=JSON.parse(_sess);
-
-// ── Init user info ──
-document.getElementById('user-name').textContent=session.nombre||session.usuario;
-document.getElementById('user-role').textContent=session.rol==='admin'?'Administrador':'Operador';
-document.getElementById('user-avatar').textContent=(session.nombre||session.usuario).charAt(0).toUpperCase();
-if(session.rol==='admin')document.getElementById('link-admin').style.display='flex';
-
-function logout(){sessionStorage.removeItem('validadorUser');window.location.href='login.html';}
-
-// ── Mobile sidebar ──
-function openSidebar(){document.getElementById('sidebar').classList.add('open');document.getElementById('overlay').classList.add('open');}
-function closeSidebar(){document.getElementById('sidebar').classList.remove('open');document.getElementById('overlay').classList.remove('open');}
+// ── Auth (shared.js) ──
+const session = requireAuth();
+if (!session) { /* redirected */ }
+initSidebarUser(session);
 
 // ── Tipo selector ──
 let tipoActual='calle';
@@ -909,17 +884,8 @@ document.getElementById('validForm').addEventListener('submit',async(e)=>{
         operadorNombre:session.nombre||session.usuario, horaStr,
         detalle:data.detalle||'' });
 
-      // ── 2. Guardar en Firestore (best-effort, en paralelo) ──
-      db.collection('validacionesWIN').add({
-        dni, direccion:direccionResumen, tipo:tipoActual,
-        distrito, hhuu, via, numero, observaciones:obs,
-        operador:session.usuario, operadorNombre:session.nombre||session.usuario,
-        resultado:tipo_r, detalleResultado:data.detalle||'',
-        scoreNum, aprobado, tieneCobertura:tieneCob,
-        fechaISO:new Date().toISOString(),
-        fecha:firebase.firestore.FieldValue.serverTimestamp(),
-      }).then(ref=>{ docId=ref.id; console.log('✓ Firestore guardado ID:', ref.id); })
-        .catch(e=>  console.warn('⚠ Firestore no guardó:', e.message));
+      // ── 2. Firestore lo guarda el servidor (server.js → guardarEnFirestore) ──
+      // No guardar aquí para evitar duplicados
 
       // ── 3. Mostrar tarjeta de resultado ──
       let uiType, uiTitle, uiSub;
@@ -1073,13 +1039,6 @@ async function loadHistorial(){
     snap.forEach(doc=>{
       const d=doc.data();
       const fechaStr=d.fechaISO?new Date(d.fechaISO).toLocaleTimeString('es-PE',{hour:'2-digit',minute:'2-digit'}):'--';
-      const badgeMap={
-        'pendiente':    '<span class="badge badge-pending"><i class="fas fa-clock"></i> Pendiente</span>',
-        'aprobado':     '<span class="badge badge-success"><i class="fas fa-check-circle"></i> Aprobado</span>',
-        'rechazado':    '<span class="badge badge-error"><i class="fas fa-user-times"></i> Score bajo</span>',
-        'sin_cobertura':'<span class="badge badge-error"><i class="fas fa-times"></i> Sin cobertura</span>',
-        'con_cobertura':'<span class="badge badge-success"><i class="fas fa-wifi"></i> Con cobertura</span>',
-      };
       const tr=document.createElement('tr');
       tr.style.cursor='pointer';
       tr.title='Clic para ver detalles';
@@ -1087,7 +1046,7 @@ async function loadHistorial(){
         <td style="font-weight:600;color:#fff">${escHtml(d.dni||'')}</td>
         <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escHtml(d.direccion||'')}">${escHtml(d.direccion||'')}</td>
         <td>${d.tipo==='coords'?'<i class="fas fa-crosshairs" style="color:var(--primary-light)"></i> Coords':'<i class="fas fa-road" style="color:var(--primary-light)"></i> Calle'}</td>
-        <td>${badgeMap[d.resultado]||badgeMap['pendiente']}</td>
+        <td>${BADGE_MAP[d.resultado]||BADGE_MAP.pendiente}</td>
         <td>${escHtml(d.operadorNombre||d.operador||'')}</td>
         <td>${fechaStr}</td>`;
       tr.addEventListener('click', ()=> abrirDetalle(doc.id, d));
@@ -1114,7 +1073,7 @@ async function loadStats(){
   }catch(e){}
 }
 
-function escHtml(s){return String(s).replace(/[<>&"']/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;',"'":'&#39;'}[c]));}
+// escHtml, BADGE_MAP, BADGE_MAP_LG, copyToClipboard, showToast — from shared.js
 
 // Añade una fila al inicio de la tabla del historial directamente en el DOM
 function agregarFilaHistorial(d) {
@@ -1122,18 +1081,13 @@ function agregarFilaHistorial(d) {
   // Quitar mensaje "sin validaciones" si existe
   if(tbody.querySelector('.empty-state')) tbody.innerHTML='';
 
-  const badgeMap = {
-    'aprobado':     '<span class="badge badge-success"><i class="fas fa-check-circle"></i> Aprobado</span>',
-    'rechazado':    '<span class="badge badge-error"><i class="fas fa-user-times"></i> Score bajo</span>',
-    'sin_cobertura':'<span class="badge badge-error"><i class="fas fa-times"></i> Sin cobertura</span>',
-  };
   const tr = document.createElement('tr');
   tr.style.cursor='pointer';
   tr.innerHTML=`
     <td style="font-weight:600;color:#fff">${escHtml(d.dni||'')}</td>
     <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escHtml(d.direccion||'')}">${escHtml(d.direccion||'')}</td>
     <td>${d.tipo==='coords'?'<i class="fas fa-crosshairs" style="color:var(--primary-light)"></i> Coords':'<i class="fas fa-road" style="color:var(--primary-light)"></i> Calle'}</td>
-    <td>${badgeMap[d.resultado]||'<span class="badge badge-pending">Pendiente</span>'}</td>
+    <td>${BADGE_MAP[d.resultado]||BADGE_MAP.pendiente}</td>
     <td>${escHtml(d.operadorNombre||'')}</td>
     <td>${escHtml(d.horaStr||'')}</td>`;
   tr.addEventListener('click', ()=> abrirDetalle('', d));
@@ -1143,12 +1097,6 @@ function agregarFilaHistorial(d) {
 // ── Modal detalle de validación ──
 function abrirDetalle(id, d) {
   const modal = document.getElementById('modal-detalle');
-  const badgeMap = {
-    'pendiente':    '<span class="badge badge-pending" style="font-size:.82rem;padding:.3rem .9rem"><i class="fas fa-clock"></i> Pendiente</span>',
-    'aprobado':     '<span class="badge badge-success" style="font-size:.82rem;padding:.3rem .9rem"><i class="fas fa-check-circle"></i> Aprobado</span>',
-    'rechazado':    '<span class="badge badge-error"   style="font-size:.82rem;padding:.3rem .9rem"><i class="fas fa-user-times"></i> Score bajo</span>',
-    'sin_cobertura':'<span class="badge badge-error"   style="font-size:.82rem;padding:.3rem .9rem"><i class="fas fa-times-circle"></i> Sin cobertura</span>',
-  };
   // Título con DNI
   document.getElementById('modal-det-titulo').innerHTML =
     `<i class="fas fa-id-card" style="color:var(--primary-light);margin-right:.5rem"></i>DNI: ${escHtml(d.dni||'—')}`;
@@ -1158,7 +1106,7 @@ function abrirDetalle(id, d) {
     : '—';
   document.getElementById('modal-det-fecha').textContent = fechaLegible;
   // Badge
-  document.getElementById('modal-det-badge').innerHTML = badgeMap[d.resultado] || badgeMap['pendiente'];
+  document.getElementById('modal-det-badge').innerHTML = BADGE_MAP_LG[d.resultado] || BADGE_MAP_LG['pendiente'];
 
   // Armar campos
   const campos = [
@@ -1188,8 +1136,9 @@ function abrirDetalle(id, d) {
   grid.innerHTML = '';
   campos.forEach(c => {
     const div = document.createElement('div');
-    div.style.cssText = `background:rgba(255,255,255,.04);border-radius:8px;padding:.75rem 1rem;${c.full?'grid-column:1/-1':''}`;
-    div.innerHTML = `<div style="font-size:.67rem;text-transform:uppercase;letter-spacing:.08em;color:var(--text-muted);margin-bottom:.3rem">${escHtml(c.label)}</div><div style="font-size:.88rem;font-weight:600;color:#fff;word-break:break-word">${escHtml(c.val)}</div>`;
+    div.className = 'detail-item';
+    if(c.full) div.style.gridColumn = '1/-1';
+    div.innerHTML = `<span class="copy-hint"><i class="fas fa-copy"></i> Copiar</span><div class="detail-label">${escHtml(c.label)}</div><div class="detail-val">${escHtml(c.val)}</div>`;
     grid.appendChild(div);
   });
 
