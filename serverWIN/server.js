@@ -611,48 +611,126 @@ async function ejecutarValidacion(datos) {
   await sleep(1500);
   await shot(pg, '15_score_buscando');
 
-  // ── PASO 12: Cerrar SweetAlert si aparece y leer score ────────
+  // ── PASO 12: Leer SweetAlert (puede ser éxito, rechazo, advertencia, etc.) ────────
   setProgreso(12, 'Esperando resultado del score...', '⏳');
   console.log('⏳ Esperando resultado del score...');
 
-  // Cerrar el SweetAlert ("Bien... Adelante") si aparece
+  let swalTitulo = '';
+  let swalMensaje = '';
+  let swalTipo = '';  // success, error, warning, info
+  let scoreObtenido = false;
+
   try {
-    await pg.waitForSelector('.swal2-confirm', { visible: true, timeout: 8000 });
-    await sleep(500);
-    await pg.click('.swal2-confirm');
-    console.log('  ✓ SweetAlert cerrado');
+    await pg.waitForSelector('.swal2-popup', { visible: true, timeout: 12000 });
+    await sleep(600);
+    await shot(pg, '15b_swal_visible');
+
+    // Leer TODO el contenido del SweetAlert antes de cerrarlo
+    const swalData = await pg.evaluate(() => {
+      const popup = document.querySelector('.swal2-popup');
+      if (!popup) return null;
+      const titulo = (document.getElementById('swal2-title') || {}).textContent || '';
+      const mensaje = (document.getElementById('swal2-html-container') || {}).textContent || '';
+      // Detectar tipo por las clases del popup
+      let tipo = 'info';
+      if (popup.classList.contains('swal2-icon-success')) tipo = 'success';
+      else if (popup.classList.contains('swal2-icon-error')) tipo = 'error';
+      else if (popup.classList.contains('swal2-icon-warning')) tipo = 'warning';
+      else if (popup.classList.contains('swal2-icon-info')) tipo = 'info';
+      return { titulo: titulo.trim(), mensaje: mensaje.trim(), tipo };
+    });
+
+    if (swalData) {
+      swalTitulo = swalData.titulo;
+      swalMensaje = swalData.mensaje;
+      swalTipo = swalData.tipo;
+      console.log(`  🔔 SweetAlert [${swalTipo}]: "${swalTitulo}" — "${swalMensaje}"`);
+    }
+
+    // Cerrar el SweetAlert
+    await pg.click('.swal2-confirm').catch(() => {});
     await sleep(800);
+    console.log('  ✓ SweetAlert cerrado');
   } catch(_) {
     console.log('  → Sin SweetAlert, continuando...');
   }
 
-  // Esperar que #estamos_verificando tenga el score (ej: "Score: 401 - 500")
-  try {
-    await pg.waitForFunction(() => {
-      const el = document.getElementById('estamos_verificando');
-      return el && el.textContent.trim() !== '' && el.textContent.includes('Score');
-    }, { timeout: 20000 });
-    await sleep(500);
-  } catch(_) {
-    await shot(pg, '16_score_timeout');
-    throw new Error('Tiempo de espera agotado al obtener el score del cliente');
+  // Determinar si el SweetAlert indica que NO se puede continuar
+  // (el score no va a aparecer — WIN redirige al inicio)
+  const mensajeLower = (swalTitulo + ' ' + swalMensaje).toLowerCase();
+  const esAlertaBloqueo = swalTipo === 'error' || swalTipo === 'warning' ||
+    /no califica|no cumple|moroso|deuda|bloqueado|inhabilitado|rechazado|no.?procede|ya.?existe|duplicado|registrado|observ|pendiente|venta.?no|no.?apto|restringido|denegad|limit|excedi/i.test(mensajeLower);
+
+  // Si es éxito ("Bien... Adelante") → continuar al score
+  // Si es bloqueo/rechazo → devolver resultado con el mensaje del alert
+  let scoreDetalle = '';
+  let scoreTitulo = '';
+  let scoreNum = null;
+  let aprobado = false;
+
+  if (esAlertaBloqueo) {
+    // WIN no va a mostrar score — el alert ES el resultado
+    console.log(`  ⚠ Alerta de bloqueo detectada: "${swalTitulo}: ${swalMensaje}"`);
+    scoreDetalle = `${swalTitulo}: ${swalMensaje}`.trim();
+    aprobado = false;
+    await shot(pg, '16_alerta_bloqueo');
+  } else {
+    // Éxito o info neutral — esperar que aparezca el score
+    try {
+      await pg.waitForFunction(() => {
+        const el = document.getElementById('estamos_verificando');
+        return el && el.textContent.trim() !== '' && el.textContent.includes('Score');
+      }, { timeout: 20000 });
+      await sleep(500);
+      scoreObtenido = true;
+    } catch(_) {
+      await shot(pg, '16_score_timeout');
+      // Si no apareció el score pero hubo un SweetAlert, usar ese mensaje
+      if (swalMensaje) {
+        console.log(`  ⚠ Score no apareció, usando mensaje del alert: "${swalMensaje}"`);
+        scoreDetalle = `${swalTitulo}: ${swalMensaje}`.trim();
+      } else {
+        // Verificar si apareció otro SweetAlert mientras esperábamos
+        const swal2 = await pg.evaluate(() => {
+          const popup = document.querySelector('.swal2-popup');
+          if (!popup || popup.style.display === 'none') return null;
+          return {
+            titulo: (document.getElementById('swal2-title') || {}).textContent || '',
+            mensaje: (document.getElementById('swal2-html-container') || {}).textContent || '',
+          };
+        }).catch(() => null);
+        if (swal2 && (swal2.titulo || swal2.mensaje)) {
+          scoreDetalle = `${swal2.titulo}: ${swal2.mensaje}`.trim();
+          console.log(`  ⚠ Segundo SweetAlert detectado: "${scoreDetalle}"`);
+          await pg.click('.swal2-confirm').catch(() => {});
+          await sleep(500);
+        } else {
+          scoreDetalle = 'No se pudo obtener el score del cliente';
+        }
+      }
+    }
+
+    if (scoreObtenido) {
+      scoreDetalle = await pg.$eval('#estamos_verificando', el => el.textContent.trim()).catch(() => '');
+      scoreTitulo  = await pg.$eval('#espere_por_favor',    el => el.textContent.trim()).catch(() => '');
+      console.log(`  📊 Score texto: "${scoreDetalle}" | Título: "${scoreTitulo}"`);
+    }
   }
 
-  const scoreDetalle = await pg.$eval('#estamos_verificando', el => el.textContent.trim()).catch(() => '');
-  const scoreTitulo  = await pg.$eval('#espere_por_favor',    el => el.textContent.trim()).catch(() => '');
   await shot(pg, '16_score_resultado');
-  console.log(`  📊 Score texto: "${scoreDetalle}" | Título: "${scoreTitulo}"`);
 
   // Extraer el número MENOR del rango (ej: "Score: 201 - 500" → 201)
-  // Se usa el mínimo: si algún extremo del rango está bajo 301, no califica
   const numeros = scoreDetalle.match(/\d+/g);
-  const scoreNum = numeros ? Math.min(...numeros.map(Number)) : null;
-  const aprobado = tieneCobertura && scoreNum !== null && scoreNum >= 301;
+  scoreNum = numeros && scoreObtenido ? Math.min(...numeros.map(Number)) : null;
+  if (!esAlertaBloqueo) {
+    aprobado = tieneCobertura && scoreNum !== null && scoreNum >= 301;
+  }
 
-  console.log(`  📊 Score: ${scoreNum} | Aprobado (≥301): ${aprobado}`);
+  console.log(`  📊 Score: ${scoreNum} | Aprobado (≥301): ${aprobado} | Bloqueo: ${esAlertaBloqueo}`);
 
   // ── Guardar en Firestore desde el servidor ──────────────────────
   const resultado = aprobado ? 'aprobado' : 'rechazado';
+  const observacionSwal = esAlertaBloqueo ? `[WIN] ${swalTitulo}: ${swalMensaje}`.trim() : '';
   try {
     await guardarEnFirestore({
       dni:              datos.dni       || '',
@@ -666,6 +744,7 @@ async function ejecutarValidacion(datos) {
       numero:           datos.numero    || '',
       resultado,
       detalleResultado: scoreDetalle    || '',
+      observacionWIN:   observacionSwal,
       scoreNum:         scoreNum        !== null ? scoreNum : -1,
       aprobado,
       tieneCobertura,
@@ -685,13 +764,17 @@ async function ejecutarValidacion(datos) {
   return {
     ok:             true,
     resultado,
-    detalle:        scoreDetalle || scoreTitulo || 'Score obtenido',
+    detalle:        scoreDetalle || scoreTitulo || observacionSwal || 'Consulta completada',
     scoreTitulo,
     scoreDetalle,
     scoreNum,
     aprobado,
     tieneCobertura,
-    paso:           'score_obtenido',
+    observacionWIN: observacionSwal,
+    alertaTipo:     swalTipo,
+    alertaTitulo:   swalTitulo,
+    alertaMensaje:  swalMensaje,
+    paso:           esAlertaBloqueo ? 'alerta_win' : 'score_obtenido',
   };
 }
 

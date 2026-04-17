@@ -102,13 +102,16 @@
     <img src="../assets/icons/ltel.jpeg" style="width:28px;height:28px;border-radius:6px;object-fit:contain;background:#fff;padding:2px" alt="L-TEL">
     <span style="font-weight:700;font-size:.9rem;color:#fff">Usuarios</span>
   </div>
-  <div style="width:40px"></div>
+  <button class="theme-toggle" onclick="toggleTheme()" title="Cambiar tema"><i class="fas fa-sun"></i></button>
 </div>
 
 <main class="main">
   <div class="topbar">
     <div class="topbar-title"><i class="fas fa-users" style="color:var(--primary-light);margin-right:.5rem"></i>Gestión de Trabajadores</div>
-    <button class="btn btn-primary" onclick="abrirModalNuevo()"><i class="fas fa-user-plus"></i> Nuevo Trabajador</button>
+    <div style="display:flex;align-items:center;gap:.75rem">
+      <button class="btn btn-primary" onclick="abrirModalNuevo()"><i class="fas fa-user-plus"></i> Nuevo Trabajador</button>
+      <button class="theme-toggle" onclick="toggleTheme()" title="Cambiar tema"><i class="fas fa-sun"></i></button>
+    </div>
   </div>
 
   <div class="content" style="max-width:1100px">
@@ -156,7 +159,6 @@
             </tr>
           </thead>
           <tbody id="tabla-body">
-            <tr><td colspan="8"><div class="empty-state"><i class="fas fa-users"></i>Cargando...</div></td></tr>
           </tbody>
         </table>
       </div>
@@ -173,6 +175,9 @@ if (session) {
   var todosUsuarios = [];
   var validacionesPorUsuario = {};
   var editId = null;
+
+  // Skeleton inicial
+  document.getElementById('tabla-body').innerHTML = skeletonRows(8, 4);
 
   async function cargarValidacionesPorUsuario() {
     try {

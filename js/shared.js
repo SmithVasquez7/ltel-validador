@@ -169,5 +169,117 @@ var BADGE_MAP_LG = {
   pendiente:     '<span class="badge badge-pending" style="font-size:.82rem;padding:.3rem .9rem"><i class="fas fa-clock"></i> Pendiente</span>',
 };
 
+// ── Theme Toggle (dark/light) ───────────────────────────────
+var THEME_KEY = 'validadorTheme';
+
+function getTheme() {
+  return localStorage.getItem(THEME_KEY) || 'dark';
+}
+
+function setTheme(theme) {
+  document.documentElement.setAttribute('data-theme', theme);
+  localStorage.setItem(THEME_KEY, theme);
+  // Actualizar todos los iconos de toggle
+  var icons = document.querySelectorAll('.theme-toggle i');
+  for (var i = 0; i < icons.length; i++) {
+    icons[i].className = theme === 'dark' ? 'fas fa-sun' : 'fas fa-moon';
+  }
+}
+
+function toggleTheme() {
+  setTheme(getTheme() === 'dark' ? 'light' : 'dark');
+}
+
+// Aplicar tema guardado inmediatamente (antes de DOMContentLoaded para evitar flash)
+(function() {
+  var saved = localStorage.getItem(THEME_KEY);
+  if (saved) document.documentElement.setAttribute('data-theme', saved);
+})();
+
+// ── Skeleton Loading ────────────────────────────────────────
+function skeletonRows(cols, rows) {
+  rows = rows || 5;
+  var widths = ['w-60','w-70','w-50','w-80','w-40','w-30','w-60','w-70'];
+  var html = '';
+  for (var r = 0; r < rows; r++) {
+    html += '<tr class="skeleton-row">';
+    for (var c = 0; c < cols; c++) {
+      var w = widths[(r + c) % widths.length];
+      // Una columna al azar usa badge skeleton
+      if (c === cols - 2 && cols > 3) {
+        html += '<td><div class="skeleton-bar w-badge"></div></td>';
+      } else {
+        html += '<td><div class="skeleton-bar ' + w + '"></div></td>';
+      }
+    }
+    html += '</tr>';
+  }
+  return html;
+}
+
+// ── Favicon Dinámico con Notificación ───────────────────────
+var _faviconOriginal = null;
+var _faviconCanvas = null;
+
+function setFaviconBadge(count) {
+  var link = document.querySelector('link[rel="icon"]');
+  if (!link) return;
+
+  // Guardar favicon original la primera vez
+  if (!_faviconOriginal) {
+    _faviconOriginal = link.href;
+  }
+
+  if (!count || count <= 0) {
+    // Restaurar favicon original
+    link.href = _faviconOriginal;
+    document.title = document.title.replace(/^\(\d+\)\s*/, '');
+    return;
+  }
+
+  // Crear canvas para dibujar badge sobre el favicon
+  if (!_faviconCanvas) {
+    _faviconCanvas = document.createElement('canvas');
+    _faviconCanvas.width = 32;
+    _faviconCanvas.height = 32;
+  }
+  var canvas = _faviconCanvas;
+  var ctx = canvas.getContext('2d');
+
+  var img = new Image();
+  img.crossOrigin = 'anonymous';
+  img.onload = function() {
+    ctx.clearRect(0, 0, 32, 32);
+    ctx.drawImage(img, 0, 0, 32, 32);
+
+    // Dibujar circulo rojo con número
+    ctx.beginPath();
+    ctx.arc(24, 8, 9, 0, 2 * Math.PI);
+    ctx.fillStyle = '#ef4444';
+    ctx.fill();
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 11px Arial';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(count > 9 ? '9+' : String(count), 24, 8.5);
+
+    link.href = canvas.toDataURL('image/png');
+  };
+  img.onerror = function() {};
+  img.src = _faviconOriginal;
+
+  // Actualizar título del tab
+  var cleanTitle = document.title.replace(/^\(\d+\)\s*/, '');
+  document.title = '(' + count + ') ' + cleanTitle;
+}
+
 // ── Init on DOMContentLoaded ─────────────────────────────────
-document.addEventListener('DOMContentLoaded', enableDetailCopy);
+document.addEventListener('DOMContentLoaded', function() {
+  enableDetailCopy();
+  // Aplicar tema y actualizar iconos
+  setTheme(getTheme());
+});

@@ -119,7 +119,7 @@
     <img src="../assets/icons/ltel.jpeg" style="width:28px;height:28px;border-radius:6px;object-fit:contain;background:#fff;padding:2px" alt="L-TEL">
     <span style="font-weight:700;font-size:.9rem;color:#fff">Admin Panel</span>
   </div>
-  <div style="width:40px"></div>
+  <button class="theme-toggle" onclick="toggleTheme()" title="Cambiar tema"><i class="fas fa-sun"></i></button>
 </div>
 
 <!-- MAIN -->
@@ -129,9 +129,12 @@
       <div class="topbar-title" id="topbar-title">Dashboard</div>
       <div class="topbar-sub" id="topbar-sub">Resumen general del sistema</div>
     </div>
-    <div class="server-status checking" id="server-status" onclick="checkServer()" title="Clic para verificar estado del servidor">
-      <div class="status-dot"></div>
-      <span id="server-status-text">Verificando...</span>
+    <div style="display:flex;align-items:center;gap:.75rem">
+      <div class="server-status checking" id="server-status" onclick="checkServer()" title="Clic para verificar estado del servidor">
+        <div class="status-dot"></div>
+        <span id="server-status-text">Verificando...</span>
+      </div>
+      <button class="theme-toggle" onclick="toggleTheme()" title="Cambiar tema"><i class="fas fa-sun"></i></button>
     </div>
   </div>
 
@@ -183,7 +186,6 @@
               <tr><th>Operador</th><th>DNI</th><th>Dirección</th><th>Score</th><th>Resultado</th><th>Hora</th></tr>
             </thead>
             <tbody id="tbl-recientes">
-              <tr class="loading-row"><td colspan="6"><i class="fas fa-spinner fa-spin"></i> Cargando...</td></tr>
             </tbody>
           </table>
         </div>
@@ -218,7 +220,6 @@
               <tr><th>#</th><th>Operador</th><th>DNI Cliente</th><th>Dirección</th><th>Cobertura</th><th>Score</th><th>Resultado</th><th>Fecha/Hora</th></tr>
             </thead>
             <tbody id="tbl-historial">
-              <tr class="loading-row"><td colspan="8"><i class="fas fa-spinner fa-spin"></i> Cargando...</td></tr>
             </tbody>
           </table>
         </div>
@@ -246,7 +247,6 @@
               <tr><th>Trabajador</th><th>Usuario</th><th>Total</th><th>Aprobados</th><th>Rechazados</th><th>Sin cob.</th><th>Tasa aprob.</th><th>Última actividad</th></tr>
             </thead>
             <tbody id="tbl-trabajadores">
-              <tr class="loading-row"><td colspan="8"><i class="fas fa-spinner fa-spin"></i> Cargando...</td></tr>
             </tbody>
           </table>
         </div>
@@ -438,6 +438,9 @@ if (session) {
     document.getElementById('st-tasa').textContent      = total ? Math.round(aprobados/total*100)+'%' : '0%';
     document.getElementById('st-operadores').textContent= operadores.size;
 
+    // Favicon dinámico: mostrar total de validaciones del día cuando el tab está en segundo plano
+    if (total > 0 && document.hidden) setFaviconBadge(total);
+
     var tbody = document.getElementById('tbl-recientes');
     if (!filas.length) { tbody.innerHTML='<tr class="loading-row"><td colspan="6">No hay validaciones hoy.</td></tr>'; return; }
     tbody.innerHTML = filas.slice(0,20).map(function(d) {
@@ -450,7 +453,7 @@ if (session) {
   // ── HISTORIAL ──
   async function loadHistorial() {
     var tbody = document.getElementById('tbl-historial');
-    tbody.innerHTML = '<tr class="loading-row"><td colspan="8"><i class="fas fa-spinner fa-spin"></i> Cargando...</td></tr>';
+    tbody.innerHTML = skeletonRows(8, 6);
 
     var fOp    = document.getElementById('f-operador').value;
     var fRes   = document.getElementById('f-resultado').value;
@@ -502,7 +505,7 @@ if (session) {
   // ── TRABAJADORES (con límite de período) ──
   async function loadTrabajadores() {
     var tbody = document.getElementById('tbl-trabajadores');
-    tbody.innerHTML = '<tr class="loading-row"><td colspan="8"><i class="fas fa-spinner fa-spin"></i> Cargando...</td></tr>';
+    tbody.innerHTML = skeletonRows(8, 5);
 
     var dias = parseInt(document.getElementById('f-periodo-workers').value) || 0;
     var q = db.collection('validacionesWIN').orderBy('fechaISO','desc');
@@ -635,12 +638,20 @@ if (session) {
     }
   };
 
-  // ── INIT ──
+  // ── INIT (mostrar skeletons mientras carga) ──
+  document.getElementById('tbl-recientes').innerHTML = skeletonRows(6, 5);
+  document.getElementById('tbl-historial').innerHTML = skeletonRows(8, 6);
+  document.getElementById('tbl-trabajadores').innerHTML = skeletonRows(8, 5);
   loadDashboard();
   loadLastWinUpdate();
   cargarServerURL().then(function() {
     checkServer();
     setInterval(checkServer, 60000);
+  });
+
+  // Limpiar badge del favicon al volver al tab
+  document.addEventListener('visibilitychange', function() {
+    if (!document.hidden) setFaviconBadge(0);
   });
 }
 </script>

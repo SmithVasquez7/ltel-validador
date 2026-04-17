@@ -14,87 +14,31 @@
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
 <script src="js/shared.js"></script>
 <style>
-*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
-:root{
-  --primary:#0ea5e9;--primary-dark:#0284c7;--primary-light:#38bdf8;
-  --accent:#06b6d4;--sidebar-w:260px;
-  --dark:#0a1628;--bg:#0f1e35;--bg-card:rgba(255,255,255,0.04);
-  --text:#ffffff;--text-secondary:#94a3b8;--text-muted:#475569;
-  --border:rgba(255,255,255,0.07);--border-hover:rgba(14,165,233,0.35);
-  --danger:#ef4444;--success:#22c55e;--warning:#f59e0b;
-  --radius:10px;--radius-lg:14px;
-}
-html{scroll-behavior:smooth}
-body{font-family:'Inter',sans-serif;background:var(--dark);color:var(--text);min-height:100vh;display:flex;-webkit-font-smoothing:antialiased}
-::-webkit-scrollbar{width:5px;height:5px}
-::-webkit-scrollbar-track{background:transparent}
-::-webkit-scrollbar-thumb{background:rgba(14,165,233,.25);border-radius:10px}
+/* Page-specific styles — sidebar, topbar, base vienen de shared.css */
 
-/* ── SIDEBAR ── */
-.sidebar{width:var(--sidebar-w);min-height:100vh;background:rgba(10,22,40,0.95);border-right:1px solid var(--border);display:flex;flex-direction:column;position:fixed;top:0;left:0;z-index:100;backdrop-filter:blur(20px)}
-.sidebar-header{padding:1.5rem 1.25rem 1rem;border-bottom:1px solid var(--border)}
-.sidebar-logo{display:flex;align-items:center;gap:.85rem}
-.sidebar-logo-img{width:42px;height:42px;border-radius:10px;overflow:hidden;background:#fff;border:1px solid rgba(14,165,233,.2);flex-shrink:0}
-.sidebar-logo-img img{width:100%;height:100%;object-fit:contain;padding:4px}
-.sidebar-logo-text{display:flex;flex-direction:column}
-.sidebar-logo-text strong{font-size:.95rem;font-weight:700;color:#fff}
-.sidebar-logo-text span{font-size:.68rem;color:var(--text-secondary);letter-spacing:.03em}
-.sidebar-nav{flex:1;padding:1rem 0;overflow-y:auto}
-.nav-section{padding:.5rem 1.25rem .25rem;font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--text-muted)}
-.nav-link{display:flex;align-items:center;gap:.75rem;padding:.65rem 1.25rem;font-size:.85rem;font-weight:500;color:var(--text-secondary);text-decoration:none;transition:all .18s;border-left:3px solid transparent;cursor:pointer}
-.nav-link:hover{color:#fff;background:rgba(255,255,255,.04)}
-.nav-link.active{color:var(--primary-light);background:rgba(14,165,233,.08);border-left-color:var(--primary)}
-.nav-link i{width:18px;text-align:center;font-size:.9rem}
-.sidebar-footer{padding:1rem 1.25rem;border-top:1px solid var(--border)}
-.user-info{display:flex;align-items:center;gap:.75rem;margin-bottom:.85rem}
-.user-avatar{width:36px;height:36px;background:linear-gradient(135deg,var(--primary),var(--accent));border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:.85rem;flex-shrink:0}
-.user-name{font-size:.85rem;font-weight:600;color:#fff}
-.user-role{font-size:.7rem;color:var(--text-secondary);margin-top:.1rem}
-.btn-logout{width:100%;padding:.55rem;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.2);border-radius:var(--radius);color:#fca5a5;font-size:.8rem;font-weight:500;cursor:pointer;transition:all .2s;display:flex;align-items:center;justify-content:center;gap:.5rem;font-family:'Inter',sans-serif}
-.btn-logout:hover{background:rgba(239,68,68,.2);border-color:rgba(239,68,68,.4)}
-
-/* ── MAIN ── */
-.main{margin-left:var(--sidebar-w);flex:1;display:flex;flex-direction:column;min-height:100vh}
-.topbar{height:64px;background:rgba(10,22,40,.9);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:0 2rem;backdrop-filter:blur(20px);position:sticky;top:0;z-index:50}
-.topbar-title{font-size:1.05rem;font-weight:700;color:#fff}
-.topbar-right{display:flex;align-items:center;gap:1rem}
+/* Status badge (dashboard-specific) */
 .status-badge{display:flex;align-items:center;gap:.4rem;font-size:.75rem;padding:.3rem .75rem;border-radius:50px;background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.2);color:#86efac}
 .status-dot{width:6px;height:6px;border-radius:50%;background:var(--success);animation:pulse 2s ease-in-out infinite}
-@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
 
-/* ── CONTENT ── */
-.content{flex:1;padding:2rem;max-width:1000px;width:100%}
+/* Content override */
+.content{max-width:1000px}
 
 /* Stats row */
 .stats-row{display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;margin-bottom:2rem}
-.stat-card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-lg);padding:1.25rem 1.5rem;display:flex;align-items:center;gap:1rem;transition:border-color .2s}
-.stat-card:hover{border-color:var(--border-hover)}
-.stat-icon{width:44px;height:44px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:1.1rem;flex-shrink:0}
 .stat-icon.blue{background:rgba(14,165,233,.15);color:var(--primary-light)}
 .stat-icon.green{background:rgba(34,197,94,.12);color:#86efac}
 .stat-icon.red{background:rgba(239,68,68,.12);color:#fca5a5}
-.stat-label{font-size:.75rem;color:var(--text-secondary);margin-bottom:.2rem}
-.stat-val{font-size:1.6rem;font-weight:800;color:#fff;line-height:1}
 
-/* Form card */
+/* Form card (page-specific) */
 .form-card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-lg);padding:2rem;margin-bottom:2rem}
 .form-card-header{display:flex;align-items:center;gap:.75rem;margin-bottom:1.75rem;padding-bottom:1.25rem;border-bottom:1px solid var(--border)}
 .form-card-icon{width:38px;height:38px;background:rgba(14,165,233,.12);border-radius:9px;display:flex;align-items:center;justify-content:center;color:var(--primary-light);font-size:.95rem}
-.form-card-title{font-size:1rem;font-weight:700;color:#fff}
+.form-card-title{font-size:1rem;font-weight:700;color:var(--text)}
 .form-card-sub{font-size:.78rem;color:var(--text-secondary);margin-top:.15rem}
 
 .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:1.25rem}
 @media(max-width:640px){.form-grid{grid-template-columns:1fr}}
-.form-group{display:flex;flex-direction:column;gap:.5rem}
 .form-group.full{grid-column:1/-1}
-.form-label{font-size:.8rem;font-weight:600;color:rgba(255,255,255,.65);letter-spacing:.3px}
-.form-input-wrap{position:relative}
-.form-icon{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:rgba(255,255,255,.25);font-size:.85rem;pointer-events:none}
-.form-input{width:100%;padding:.8rem 1rem .8rem 2.35rem;background:rgba(255,255,255,.05);border:1px solid var(--border);border-radius:var(--radius);color:#fff;font-family:'Inter',sans-serif;font-size:.88rem;outline:none;transition:all .2s}
-.form-input::placeholder{color:rgba(255,255,255,.2)}
-.form-input:focus{border-color:var(--primary);background:rgba(14,165,233,.06);box-shadow:0 0 0 3px rgba(14,165,233,.12)}
-textarea.form-input{resize:vertical;min-height:80px;line-height:1.5}
-.form-hint{font-size:.72rem;color:var(--text-muted);margin-top:.25rem;display:flex;align-items:center;gap:.3rem}
 
 /* Type selector */
 .type-selector{display:flex;gap:.5rem}
@@ -105,16 +49,9 @@ textarea.form-input{resize:vertical;min-height:80px;line-height:1.5}
 
 /* Actions */
 .form-actions{display:flex;gap:.75rem;margin-top:1.5rem;padding-top:1.5rem;border-top:1px solid var(--border)}
-.btn{padding:.75rem 1.5rem;border-radius:var(--radius);font-family:'Inter',sans-serif;font-size:.875rem;font-weight:600;cursor:pointer;transition:all .2s;display:inline-flex;align-items:center;gap:.5rem;border:none}
-.btn-primary{background:linear-gradient(135deg,var(--primary),var(--primary-dark));color:#fff;box-shadow:0 4px 16px rgba(14,165,233,.25)}
-.btn-primary:hover:not(:disabled){transform:translateY(-1px);box-shadow:0 6px 20px rgba(14,165,233,.4)}
-.btn-primary:disabled{opacity:.55;cursor:not-allowed;transform:none}
-.btn-secondary{background:rgba(255,255,255,.06);color:var(--text-secondary);border:1px solid var(--border)}
-.btn-secondary:hover{background:rgba(255,255,255,.1);color:#fff}
 .spinner-sm{width:16px;height:16px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite;display:none}
 .btn-primary.loading .spinner-sm{display:block}
 .btn-primary.loading .btn-label{display:none}
-@keyframes spin{to{transform:rotate(360deg)}}
 
 /* Result */
 .result-card{border-radius:var(--radius-lg);padding:1.75rem;margin-bottom:2rem;display:none;animation:slideIn .3s ease}
@@ -128,7 +65,7 @@ textarea.form-input{resize:vertical;min-height:80px;line-height:1.5}
 .result-card.pending .result-icon{background:rgba(245,158,11,.15);color:#fcd34d}
 .result-card.success .result-icon{background:rgba(34,197,94,.15);color:#86efac}
 .result-card.error .result-icon{background:rgba(239,68,68,.15);color:#fca5a5}
-.result-title{font-size:1rem;font-weight:700;color:#fff}
+.result-title{font-size:1rem;font-weight:700;color:var(--text)}
 .result-sub{font-size:.78rem;margin-top:.2rem}
 .result-card.pending .result-sub{color:#fcd34d}
 .result-card.success .result-sub{color:#86efac}
@@ -136,44 +73,20 @@ textarea.form-input{resize:vertical;min-height:80px;line-height:1.5}
 .result-details{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:.75rem}
 .detail-item{background:rgba(255,255,255,.04);border-radius:8px;padding:.85rem 1rem}
 .detail-label{font-size:.68rem;text-transform:uppercase;letter-spacing:.08em;color:var(--text-muted);margin-bottom:.35rem}
-.detail-val{font-size:.9rem;font-weight:600;color:#fff;word-break:break-all}
+.detail-val{font-size:.9rem;font-weight:600;color:var(--text);word-break:break-all}
 
 /* History table */
 .table-card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;margin-bottom:2rem}
 .table-header{display:flex;align-items:center;justify-content:space-between;padding:1.25rem 1.5rem;border-bottom:1px solid var(--border)}
-.table-title{font-size:.95rem;font-weight:700;color:#fff}
-.table-wrap{overflow-x:auto}
-table{width:100%;border-collapse:collapse}
-thead tr{background:rgba(255,255,255,.03)}
-th{padding:.75rem 1rem;font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text-muted);text-align:left;white-space:nowrap}
-td{padding:.85rem 1rem;font-size:.83rem;color:var(--text-secondary);border-top:1px solid var(--border);vertical-align:middle}
-tr:hover td{background:rgba(255,255,255,.02)}
-.badge{display:inline-flex;align-items:center;gap:.3rem;padding:.2rem .65rem;border-radius:50px;font-size:.7rem;font-weight:600}
-.badge-success{background:rgba(34,197,94,.12);color:#86efac;border:1px solid rgba(34,197,94,.2)}
-.badge-error{background:rgba(239,68,68,.12);color:#fca5a5;border:1px solid rgba(239,68,68,.2)}
-.badge-pending{background:rgba(245,158,11,.12);color:#fcd34d;border:1px solid rgba(245,158,11,.2)}
-.empty-state{text-align:center;padding:3rem 2rem;color:var(--text-muted)}
-.empty-state i{font-size:2rem;margin-bottom:.75rem;display:block;color:var(--text-muted)}
+.table-title{font-size:.95rem;font-weight:700;color:var(--text)}
 
-/* Mobile nav */
-.mobile-topbar{display:none;height:58px;background:rgba(10,22,40,.95);border-bottom:1px solid var(--border);align-items:center;justify-content:space-between;padding:0 1rem;position:sticky;top:0;z-index:100}
-.hamburger{background:none;border:none;color:#fff;font-size:1.2rem;cursor:pointer;padding:.5rem}
-.sidebar-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:99;backdrop-filter:blur(4px)}
-.sidebar-overlay.open{display:block}
-
+/* Responsive overrides (sidebar/mobile comes from shared.css) */
 @media(max-width:900px){
-  .sidebar{transform:translateX(-100%);transition:transform .25s ease}
-  .sidebar.open{transform:translateX(0)}
-  .main{margin-left:0}
-  .mobile-topbar{display:flex}
-  .topbar{display:none}
   .stats-row{grid-template-columns:repeat(2,1fr)}
 }
 @media(max-width:520px){
   .stats-row{grid-template-columns:1fr}
-  .content{padding:1rem}
   .form-actions{flex-direction:column}
-  .btn{width:100%;justify-content:center}
 }
 </style>
 </head>
@@ -343,7 +256,7 @@ tr:hover td{background:rgba(255,255,255,.02)}
     <img src="../assets/icons/ltel.jpeg" style="width:28px;height:28px;border-radius:6px;object-fit:contain;background:#fff;padding:2px" alt="L-TEL">
     <span style="font-weight:700;font-size:.9rem">L-TEL Validador</span>
   </div>
-  <div style="width:40px"></div>
+  <button class="theme-toggle" onclick="toggleTheme()" title="Cambiar tema"><i class="fas fa-sun"></i></button>
 </div>
 
 <!-- MAIN -->
@@ -356,6 +269,7 @@ tr:hover td{background:rgba(255,255,255,.02)}
       <button id="btn-server-url" onclick="abrirModalServerURL()" style="background:rgba(99,102,241,.12);border:1px solid rgba(99,102,241,.3);border-radius:8px;color:#a5b4fc;font-size:.78rem;padding:.4rem .85rem;cursor:pointer;font-family:'Inter',sans-serif;transition:all .2s" title="Configurar URL del servidor">
         <i class="fas fa-server"></i> <span id="lbl-server-url">Servidor URL</span>
       </button>
+      <button class="theme-toggle" onclick="toggleTheme()" title="Cambiar tema"><i class="fas fa-sun"></i></button>
     </div>
   </div>
 
@@ -877,19 +791,26 @@ document.getElementById('validForm').addEventListener('submit',async(e)=>{
       const aprobado  = data.aprobado === true;
       const tieneCob  = data.tieneCobertura === true;
       const horaStr   = new Date().toLocaleTimeString('es-PE',{hour:'2-digit',minute:'2-digit'});
+      const alertaWIN = data.observacionWIN || '';
+      const esAlertaWIN = data.paso === 'alerta_win';
 
       // ── 1. Añadir fila directamente a la tabla (inmediato, sin Firestore) ──
       agregarFilaHistorial({ dni, direccion:direccionResumen, tipo:tipoActual,
         resultado:tipo_r, scoreNum, aprobado, tieneCobertura:tieneCob,
         operadorNombre:session.nombre||session.usuario, horaStr,
-        detalle:data.detalle||'' });
+        detalle:data.detalle||'', observacionWIN:alertaWIN });
 
       // ── 2. Firestore lo guarda el servidor (server.js → guardarEnFirestore) ──
       // No guardar aquí para evitar duplicados
 
       // ── 3. Mostrar tarjeta de resultado ──
       let uiType, uiTitle, uiSub;
-      if(esAprobado){
+      if(esAlertaWIN){
+        // WIN mostró una alerta (rechazo, cliente moroso, duplicado, etc.)
+        uiType='error';
+        uiTitle=`⚠ ALERTA WIN — ${data.alertaTitulo||'Aviso del sistema'}`;
+        uiSub = data.alertaMensaje || alertaWIN || 'La plataforma WIN mostró una advertencia para este cliente';
+      } else if(esAprobado){
         uiType='success';
         uiTitle=`✓ APROBADO — Score: ${scoreNum}`;
         uiSub='Tiene cobertura y cumple el score mínimo (≥301)';
@@ -905,15 +826,19 @@ document.getElementById('validForm').addEventListener('submit',async(e)=>{
         uiSub='La dirección no está dentro de la cobertura WIN';
       }
       esExito = true;
-      showResult(uiType, uiTitle, uiSub, [
+
+      const detalles = [
         {label:'DNI',val:dni},
         {label:'Dirección',val:direccionResumen},
         {label:'Cobertura WIN',val:tieneCob?'✅ Tiene cobertura':'❌ Sin cobertura'},
-        {label:'Score cliente',val:scoreNum!=null?`${scoreNum} (${scoreNum>=301?'✅ Aprobado':'❌ Rechazado'})`:'—'},
+        {label:'Score cliente',val:scoreNum!=null?`${scoreNum} (${scoreNum>=301?'✅ Aprobado':'❌ Rechazado'})`:'Sin score'},
         {label:'Detalle score',val:data.detalle||'—'},
         {label:'Operador',val:session.nombre||session.usuario},
         {label:'Hora',val:horaStr},
-      ]);
+      ];
+      if(alertaWIN) detalles.push({label:'Aviso WIN',val:alertaWIN});
+
+      showResult(uiType, uiTitle, uiSub, detalles);
     } else {
       esExito = false;
       showResult('error','Error en validación',data.error||'Error desconocido',[
@@ -1092,7 +1017,18 @@ function agregarFilaHistorial(d) {
     <td>${escHtml(d.horaStr||'')}</td>`;
   tr.addEventListener('click', ()=> abrirDetalle('', d));
   tbody.prepend(tr);
+
+  // Actualizar favicon con cantidad de validaciones del día
+  var totalRows = tbody.querySelectorAll('tr:not(.empty-state)').length;
+  if (totalRows > 0 && document.hidden) {
+    setFaviconBadge(totalRows);
+  }
 }
+
+// Limpiar badge del favicon cuando el usuario vuelve al tab
+document.addEventListener('visibilitychange', function() {
+  if (!document.hidden) setFaviconBadge(0);
+});
 
 // ── Modal detalle de validación ──
 function abrirDetalle(id, d) {
@@ -1129,6 +1065,7 @@ function abrirDetalle(id, d) {
     if(d.latitud)  campos.push({label:'Latitud', val:d.latitud});
     if(d.longitud) campos.push({label:'Longitud', val:d.longitud});
   }
+  if(d.observacionWIN) campos.push({label:'Aviso WIN', val:d.observacionWIN, full:true});
   if(d.observaciones) campos.push({label:'Observaciones', val:d.observaciones, full:true});
   campos.push({label:'ID Registro', val:id.slice(0,12).toUpperCase(), full:true});
 
