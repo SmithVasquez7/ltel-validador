@@ -10,6 +10,7 @@
 <link rel="stylesheet" href="css/shared.css">
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
 <script src="js/shared.js"></script>
 <style>
 /* Page-specific: Admin panel */
@@ -60,6 +61,19 @@
 .wstat.green .wstat-val{color:#86efac}
 .wstat.red .wstat-val{color:#fca5a5}
 .wstat.blue .wstat-val{color:var(--primary-light)}
+
+/* Charts */
+.charts-grid{display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;margin-bottom:1.5rem}
+.chart-card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-lg);padding:1.5rem;overflow:hidden}
+.chart-card.full{grid-column:1/-1}
+.chart-title{font-size:.88rem;font-weight:700;color:var(--text);margin-bottom:.25rem;display:flex;align-items:center;gap:.5rem}
+.chart-title i{color:var(--primary);font-size:.85rem}
+.chart-sub{font-size:.72rem;color:var(--text-muted);margin-bottom:1.25rem}
+.chart-wrap{position:relative;width:100%;height:280px}
+.chart-wrap canvas{width:100%!important;height:100%!important}
+@media(max-width:900px){
+  .charts-grid{grid-template-columns:1fr}
+}
 </style>
 </head>
 <body>
@@ -86,6 +100,9 @@
     </div>
     <div class="nav-link" onclick="showSection('historial',this)">
       <i class="fas fa-history"></i> Historial Completo
+    </div>
+    <div class="nav-link" onclick="showSection('estadisticas',this)">
+      <i class="fas fa-chart-pie"></i> Estadísticas
     </div>
     <div class="nav-link" onclick="showSection('trabajadores',this)">
       <i class="fas fa-users"></i> Trabajadores
@@ -188,6 +205,68 @@
             <tbody id="tbl-recientes">
             </tbody>
           </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── ESTADÍSTICAS ── -->
+    <section class="section" id="sec-estadisticas">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.25rem;flex-wrap:wrap;gap:.75rem">
+        <div style="display:flex;align-items:center;gap:.75rem;flex-wrap:wrap">
+          <select class="filter-select" id="f-stats-periodo" onchange="loadEstadisticas()">
+            <option value="7">Últimos 7 días</option>
+            <option value="14">Últimos 14 días</option>
+            <option value="30" selected>Últimos 30 días</option>
+            <option value="90">Últimos 90 días</option>
+          </select>
+        </div>
+        <button class="btn-filter" onclick="loadEstadisticas()"><i class="fas fa-sync-alt"></i> Actualizar</button>
+      </div>
+
+      <!-- Resumen rápido -->
+      <div class="stats-grid" id="stats-resumen">
+        <div class="stat-card blue">
+          <div class="stat-label">Total del período</div>
+          <div class="stat-val" id="sts-total">—</div>
+          <div class="stat-sub" id="sts-promedio-sub">—</div>
+          <i class="fas fa-chart-line stat-icon-abs"></i>
+        </div>
+        <div class="stat-card green">
+          <div class="stat-label">Tasa de aprobación</div>
+          <div class="stat-val" id="sts-tasa">—</div>
+          <div class="stat-sub" id="sts-tasa-sub">—</div>
+          <i class="fas fa-percentage stat-icon-abs"></i>
+        </div>
+        <div class="stat-card purple">
+          <div class="stat-label">Mejor día</div>
+          <div class="stat-val" id="sts-mejor-dia">—</div>
+          <div class="stat-sub" id="sts-mejor-dia-sub">—</div>
+          <i class="fas fa-trophy stat-icon-abs"></i>
+        </div>
+        <div class="stat-card yellow">
+          <div class="stat-label">Operador destacado</div>
+          <div class="stat-val" id="sts-top-op">—</div>
+          <div class="stat-sub" id="sts-top-op-sub">—</div>
+          <i class="fas fa-star stat-icon-abs"></i>
+        </div>
+      </div>
+
+      <!-- Gráficos -->
+      <div class="charts-grid">
+        <div class="chart-card full">
+          <div class="chart-title"><i class="fas fa-chart-area"></i> Validaciones por día</div>
+          <div class="chart-sub">Evolución diaria de validaciones, aprobados y rechazados</div>
+          <div class="chart-wrap"><canvas id="chart-diario"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <div class="chart-title"><i class="fas fa-chart-doughnut"></i> Distribución de resultados</div>
+          <div class="chart-sub">Porcentaje por tipo de resultado</div>
+          <div class="chart-wrap"><canvas id="chart-resultados"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <div class="chart-title"><i class="fas fa-ranking-star"></i> Rendimiento por operador</div>
+          <div class="chart-sub">Top operadores por cantidad de validaciones</div>
+          <div class="chart-wrap"><canvas id="chart-operadores"></canvas></div>
         </div>
       </div>
     </section>
@@ -394,6 +473,7 @@ if (session) {
   // ── NAVEGACIÓN ──
   var sectionMeta = {
     dashboard:     {title:'Dashboard',sub:'Resumen general del sistema'},
+    estadisticas:  {title:'Estadísticas',sub:'Gráficos y métricas del equipo'},
     historial:     {title:'Historial Completo',sub:'Todas las validaciones del equipo'},
     trabajadores:  {title:'Trabajadores',sub:'Estadísticas por operador'},
     configuracion: {title:'Credenciales WIN',sub:'Configuración del sistema de automatización'},
@@ -406,6 +486,7 @@ if (session) {
     document.getElementById('topbar-title').textContent = sectionMeta[id].title;
     document.getElementById('topbar-sub').textContent   = sectionMeta[id].sub;
     if (id==='dashboard')    loadDashboard();
+    if (id==='estadisticas') loadEstadisticas();
     if (id==='historial')    loadHistorial();
     if (id==='trabajadores') loadTrabajadores();
     closeSidebar(); // cerrar sidebar en mobile
@@ -448,6 +529,225 @@ if (session) {
       var score = d.scoreNum!=null ? '<span style="font-weight:700;color:'+(d.aprobado?'#86efac':'#fca5a5')+'">'+d.scoreNum+'</span>' : '—';
       return '<tr><td><span style="font-weight:600">'+(d.operadorNombre||d.operador||'—')+'</span></td><td><code style="background:rgba(255,255,255,.06);padding:2px 6px;border-radius:4px;font-size:.8rem">'+(d.dni||'—')+'</code></td><td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text-secondary)">'+(d.direccion||'—')+'</td><td>'+score+'</td><td>'+(BADGE_MAP[d.resultado]||BADGE_MAP.pendiente)+'</td><td style="color:var(--text-muted)">'+hora+'</td></tr>';
     }).join('');
+  }
+
+  // ── ESTADÍSTICAS (Chart.js) ──
+  var chartDiario = null, chartResultados = null, chartOperadores = null;
+
+  function getChartColors() {
+    var isLight = document.documentElement.getAttribute('data-theme') === 'light';
+    return {
+      grid: isLight ? 'rgba(0,0,0,.06)' : 'rgba(255,255,255,.06)',
+      text: isLight ? '#475569' : '#94a3b8',
+      tooltip: isLight ? '#1e293b' : '#0f1e35',
+      tooltipText: isLight ? '#1e293b' : '#fff',
+    };
+  }
+
+  async function loadEstadisticas() {
+    var dias = parseInt(document.getElementById('f-stats-periodo').value) || 30;
+    var desde = new Date();
+    desde.setDate(desde.getDate() - dias);
+    desde.setHours(0,0,0,0);
+
+    var snap = await db.collection('validacionesWIN')
+      .where('fechaISO','>=', desde.toISOString())
+      .orderBy('fechaISO','desc')
+      .limit(2000).get().catch(function(){ return null; });
+
+    if (!snap || snap.empty) {
+      document.getElementById('sts-total').textContent = '0';
+      document.getElementById('sts-promedio-sub').textContent = 'sin datos';
+      return;
+    }
+
+    var docs = [];
+    snap.forEach(function(d){ docs.push(d.data()); });
+
+    // --- Agrupar por día ---
+    var porDia = {};
+    var porOperador = {};
+    var totalAprob = 0, totalRech = 0, totalSinCob = 0, totalPend = 0;
+
+    docs.forEach(function(d) {
+      var fecha = d.fechaISO ? d.fechaISO.slice(0,10) : 'sin-fecha';
+      if (!porDia[fecha]) porDia[fecha] = {total:0, aprobados:0, rechazados:0, sinCob:0};
+      porDia[fecha].total++;
+
+      var op = d.operadorNombre || d.operador || 'Desconocido';
+      if (!porOperador[op]) porOperador[op] = {total:0, aprobados:0, rechazados:0};
+      porOperador[op].total++;
+
+      if (d.resultado==='aprobado'||d.resultado==='con_cobertura') {
+        totalAprob++; porDia[fecha].aprobados++; porOperador[op].aprobados++;
+      } else if (d.resultado==='sin_cobertura') {
+        totalSinCob++; porDia[fecha].sinCob++;
+      } else if (d.resultado==='rechazado') {
+        totalRech++; porDia[fecha].rechazados++; porOperador[op].rechazados++;
+      } else {
+        totalPend++;
+      }
+    });
+
+    var totalAll = docs.length;
+    var tasaAprob = totalAll ? Math.round(totalAprob/totalAll*100) : 0;
+    var diasConDatos = Object.keys(porDia).length;
+    var promDiario = diasConDatos ? Math.round(totalAll/diasConDatos) : 0;
+
+    // Mejor día
+    var mejorDia = '', mejorDiaCant = 0;
+    Object.keys(porDia).forEach(function(f) {
+      if (porDia[f].total > mejorDiaCant) { mejorDiaCant = porDia[f].total; mejorDia = f; }
+    });
+    var mejorDiaFmt = mejorDia ? new Date(mejorDia+'T12:00:00').toLocaleDateString('es-PE',{day:'2-digit',month:'short'}) : '—';
+
+    // Top operador
+    var topOps = Object.entries(porOperador).sort(function(a,b){ return b[1].total-a[1].total; });
+    var topOp = topOps.length ? topOps[0] : null;
+
+    // Actualizar stats cards
+    document.getElementById('sts-total').textContent = totalAll;
+    document.getElementById('sts-promedio-sub').textContent = promDiario + ' promedio/día · ' + diasConDatos + ' días';
+    document.getElementById('sts-tasa').textContent = tasaAprob + '%';
+    document.getElementById('sts-tasa-sub').textContent = totalAprob + ' aprobados de ' + totalAll;
+    document.getElementById('sts-mejor-dia').textContent = mejorDiaCant;
+    document.getElementById('sts-mejor-dia-sub').textContent = mejorDiaFmt;
+    document.getElementById('sts-top-op').textContent = topOp ? topOp[0].split(' ')[0] : '—';
+    document.getElementById('sts-top-op-sub').textContent = topOp ? topOp[1].total + ' validaciones' : '—';
+
+    // --- Preparar datos para gráficos ---
+    var diasOrdenados = Object.keys(porDia).sort();
+    var labels = diasOrdenados.map(function(f) {
+      return new Date(f+'T12:00:00').toLocaleDateString('es-PE',{day:'2-digit',month:'short'});
+    });
+    var datTotal = diasOrdenados.map(function(f){ return porDia[f].total; });
+    var datAprob = diasOrdenados.map(function(f){ return porDia[f].aprobados; });
+    var datRech  = diasOrdenados.map(function(f){ return porDia[f].rechazados + porDia[f].sinCob; });
+
+    var colors = getChartColors();
+
+    // --- GRÁFICO 1: Validaciones por día (línea/área) ---
+    if (chartDiario) chartDiario.destroy();
+    chartDiario = new Chart(document.getElementById('chart-diario'), {
+      type: 'line',
+      data: {
+        labels: labels,
+        datasets: [
+          {
+            label: 'Total',
+            data: datTotal,
+            borderColor: '#0ea5e9',
+            backgroundColor: 'rgba(14,165,233,.12)',
+            fill: true,
+            tension: .35,
+            borderWidth: 2.5,
+            pointRadius: 3,
+            pointBackgroundColor: '#0ea5e9',
+          },
+          {
+            label: 'Aprobados',
+            data: datAprob,
+            borderColor: '#22c55e',
+            backgroundColor: 'rgba(34,197,94,.08)',
+            fill: true,
+            tension: .35,
+            borderWidth: 2,
+            pointRadius: 2.5,
+            pointBackgroundColor: '#22c55e',
+          },
+          {
+            label: 'Rechazados',
+            data: datRech,
+            borderColor: '#ef4444',
+            backgroundColor: 'rgba(239,68,68,.08)',
+            fill: true,
+            tension: .35,
+            borderWidth: 2,
+            pointRadius: 2.5,
+            pointBackgroundColor: '#ef4444',
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+          legend: { position: 'top', labels: { color: colors.text, padding: 16, usePointStyle: true, pointStyle: 'circle', font: { size: 12, family: 'Inter' } } },
+          tooltip: { backgroundColor: colors.tooltip, titleColor: '#fff', bodyColor: '#fff', padding: 10, cornerRadius: 8, titleFont: { family: 'Inter', weight: '600' }, bodyFont: { family: 'Inter' } },
+        },
+        scales: {
+          x: { grid: { color: colors.grid }, ticks: { color: colors.text, font: { size: 11, family: 'Inter' }, maxRotation: 45, maxTicksLimit: 15 } },
+          y: { beginAtZero: true, grid: { color: colors.grid }, ticks: { color: colors.text, font: { size: 11, family: 'Inter' }, precision: 0 } }
+        }
+      }
+    });
+
+    // --- GRÁFICO 2: Distribución de resultados (doughnut) ---
+    if (chartResultados) chartResultados.destroy();
+    chartResultados = new Chart(document.getElementById('chart-resultados'), {
+      type: 'doughnut',
+      data: {
+        labels: ['Aprobados', 'Rechazados (score)', 'Sin cobertura', 'Pendientes'],
+        datasets: [{
+          data: [totalAprob, totalRech, totalSinCob, totalPend],
+          backgroundColor: ['rgba(34,197,94,.8)', 'rgba(239,68,68,.8)', 'rgba(245,158,11,.8)', 'rgba(139,92,246,.8)'],
+          borderColor: ['rgba(34,197,94,1)', 'rgba(239,68,68,1)', 'rgba(245,158,11,1)', 'rgba(139,92,246,1)'],
+          borderWidth: 2,
+          hoverOffset: 6,
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        cutout: '62%',
+        plugins: {
+          legend: { position: 'bottom', labels: { color: colors.text, padding: 14, usePointStyle: true, pointStyle: 'circle', font: { size: 12, family: 'Inter' } } },
+          tooltip: { backgroundColor: colors.tooltip, titleColor: '#fff', bodyColor: '#fff', padding: 10, cornerRadius: 8, bodyFont: { family: 'Inter' },
+            callbacks: {
+              label: function(ctx) {
+                var total = ctx.dataset.data.reduce(function(a,b){return a+b;},0);
+                var pct = total ? Math.round(ctx.raw/total*100) : 0;
+                return ' ' + ctx.label + ': ' + ctx.raw + ' (' + pct + '%)';
+              }
+            }
+          },
+        }
+      }
+    });
+
+    // --- GRÁFICO 3: Rendimiento por operador (barras horizontales) ---
+    var topN = topOps.slice(0, 8);
+    var opLabels = topN.map(function(o){ return o[0]; });
+    var opAprob  = topN.map(function(o){ return o[1].aprobados; });
+    var opRech   = topN.map(function(o){ return o[1].rechazados; });
+    var opOtros  = topN.map(function(o){ return o[1].total - o[1].aprobados - o[1].rechazados; });
+
+    if (chartOperadores) chartOperadores.destroy();
+    chartOperadores = new Chart(document.getElementById('chart-operadores'), {
+      type: 'bar',
+      data: {
+        labels: opLabels,
+        datasets: [
+          { label: 'Aprobados', data: opAprob, backgroundColor: 'rgba(34,197,94,.75)', borderRadius: 4 },
+          { label: 'Rechazados', data: opRech, backgroundColor: 'rgba(239,68,68,.75)', borderRadius: 4 },
+          { label: 'Otros', data: opOtros, backgroundColor: 'rgba(139,92,246,.5)', borderRadius: 4 },
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        indexAxis: 'y',
+        plugins: {
+          legend: { position: 'top', labels: { color: colors.text, padding: 14, usePointStyle: true, pointStyle: 'rect', font: { size: 11, family: 'Inter' } } },
+          tooltip: { backgroundColor: colors.tooltip, titleColor: '#fff', bodyColor: '#fff', padding: 10, cornerRadius: 8, bodyFont: { family: 'Inter' } },
+        },
+        scales: {
+          x: { stacked: true, grid: { color: colors.grid }, ticks: { color: colors.text, font: { size: 11, family: 'Inter' }, precision: 0 } },
+          y: { stacked: true, grid: { display: false }, ticks: { color: colors.text, font: { size: 11, family: 'Inter', weight: '600' } } }
+        }
+      }
+    });
   }
 
   // ── HISTORIAL ──
