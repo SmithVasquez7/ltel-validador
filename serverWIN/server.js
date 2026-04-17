@@ -658,8 +658,10 @@ async function ejecutarValidacion(datos) {
   // Determinar si el SweetAlert indica que NO se puede continuar
   // (el score no va a aparecer — WIN redirige al inicio)
   const mensajeLower = (swalTitulo + ' ' + swalMensaje).toLowerCase();
-  const esAlertaBloqueo = swalTipo === 'error' || swalTipo === 'warning' ||
-    /no califica|no cumple|moroso|deuda|bloqueado|inhabilitado|rechazado|no.?procede|ya.?existe|duplicado|registrado|observ|pendiente|venta.?no|no.?apto|restringido|denegad|limit|excedi/i.test(mensajeLower);
+  // "ZONA DE RIESGO" es informativo, NO es bloqueo — el cliente sí califica
+  const esZonaRiesgo = /zona.?de.?riesgo/i.test(mensajeLower);
+  const esAlertaBloqueo = !esZonaRiesgo && (swalTipo === 'error' || swalTipo === 'warning' ||
+    /no califica|no cumple|moroso|deuda|bloqueado|inhabilitado|rechazado|no.?procede|ya.?existe|duplicado|registrado|observ|pendiente|venta.?no|no.?apto|restringido|denegad|limit|excedi/i.test(mensajeLower));
 
   // Si es éxito ("Bien... Adelante") → continuar al score
   // Si es bloqueo/rechazo → devolver resultado con el mensaje del alert
