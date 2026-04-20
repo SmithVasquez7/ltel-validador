@@ -24,7 +24,16 @@ if (IS_RENDER) {
 const app  = express();
 const PORT = process.env.PORT || 3000;
 
-app.use(cors({ origin: '*' }));
+const allowedOrigins = [
+  'https://softkes.com', 'https://www.softkes.com',
+  'http://localhost:3000', 'http://localhost:5500', 'http://127.0.0.1:5500'
+];
+app.use(cors({
+  origin: function(origin, cb){
+    if(!origin || allowedOrigins.some(o => origin.startsWith(o)) || origin.includes('ngrok')) cb(null, true);
+    else cb(new Error('CORS no permitido'));
+  }
+}));
 app.use(express.json());
 
 // ─────────────────────────────────────────
