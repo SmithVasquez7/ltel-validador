@@ -806,33 +806,22 @@ async function seleccionarSugerencia(pg, inputSel, texto) {
   const textNorm = texto.trim().toLowerCase();
 
   try {
-    // Esperar hasta 3s a que aparezca al menos un item de sugerencia visible
+    // Esperar hasta 3s a que aparezca el dropdown de autocomplete
     let intentos = 0;
     let items = [];
     while (intentos < 6) {
-      items = await pg.evaluate((inputSel) => {
-        const input = document.querySelector(inputSel);
-        if (!input) return [];
-
-        // GeoFinder mete las sugerencias en un <ul> hermano o en un contenedor cercano
-        const root = input.closest('td, .form-group, .input-group, div') || document.body;
-        const candidates = [
-          ...document.querySelectorAll('ul.ui-autocomplete li.ui-menu-item'),
-          ...document.querySelectorAll('.autocomplete-items div, .autocomplete-list li'),
-          ...document.querySelectorAll('[class*="suggest"] li, [class*="suggest"] div'),
-          ...document.querySelectorAll('[class*="autocomplete"] li, [class*="autocomplete"] div'),
-          ...document.querySelectorAll('.tt-suggestion, .dropdown-item'),
-          ...root.querySelectorAll('li, [role="option"]'),
-        ];
-
-        return candidates
+      items = await pg.evaluate(() => {
+        // Solo buscar en el dropdown real de jQuery UI Autocomplete (visible)
+        const ul = document.querySelector('ul.ui-autocomplete[style*="display: block"], ul.ui-autocomplete:not([style*="display: none"])');
+        if (!ul) return [];
+        const lis = ul.querySelectorAll('li.ui-menu-item');
+        return Array.from(lis)
           .filter(el => el.offsetParent !== null && (el.textContent || '').trim().length > 0)
-          .map(el => ({
+          .map((el, i) => ({
             text: (el.textContent || '').trim(),
-            tag:  el.tagName,
-            cls:  el.className,
+            idx: i,
           }));
-      }, inputSel);
+      });
 
       if (items.length > 0) break;
       await sleep(500);
@@ -849,41 +838,57 @@ async function seleccionarSugerencia(pg, inputSel, texto) {
       return;
     }
 
-    // Buscar la sugerencia con mejor coincidencia con el texto ingresado
+    console.log(`  → Sugerencias para "${texto}": ${items.map(i=>i.text).join(' | ')}`);
+
+    // Buscar la sugerencia con mejor coincidencia
     let mejorIdx  = 0;
     let mejorScore = -1;
     items.forEach((item, i) => {
       const t = item.text.toLowerCase();
       let score = 0;
-      if (t === textNorm)                     score = 100; // exacta
+      if (t === textNorm)                     score = 100;
       else if (t.startsWith(textNorm))        score = 80;
       else if (t.includes(textNorm))          score = 60;
       else if (textNorm.includes(t))          score = 40;
       else {
-        // contar palabras en común
-        const wordsA = textNorm.split(/\s+/);
-        const wordsB = t.split(/\s+/);
-        score = wordsA.filter(w => wordsB.some(b => b.includes(w) || w.includes(b))).length;
+        // comparar palabras significativas (ignorar separadores)
+        const wordsA = textNorm.split(/[\s,/]+/).filter(w => w.length > 2);
+        const wordsB = t.split(/[\s,/]+/).filter(w => w.length > 2);
+        const comunes = wordsA.filter(w => wordsB.some(b => b.includes(w) || w.includes(b))).length;
+        score = comunes * 10;
       }
       if (score > mejorScore) { mejorScore = score; mejorIdx = i; }
     });
 
-    console.log(`  → Sugerencias para "${texto}": ${items.map(i=>i.text).join(' | ')}`);
-    console.log(`  ✓ Eligiendo: "${items[mejorIdx].text}" (score ${mejorScore})`);
+    console.log(`  ✓ Eligiendo: "${items[mejorIdx].text}" (score ${mejorScore}, pos ${mejorIdx + 1}/${items.length})`);
 
-    // Navegar con teclado hasta la posición correcta y presionar Enter
-    await pg.focus(inputSel);
-    await sleep(200);
-    for (let i = 0; i <= mejorIdx; i++) {
-      await pg.keyboard.press('ArrowDown');
-      await sleep(150);
+    // Hacer clic directo en el elemento del dropdown (más confiable que ArrowDown)
+    const clicked = await pg.evaluate((idx) => {
+      const ul = document.querySelector('ul.ui-autocomplete[style*="display: block"], ul.ui-autocomplete:not([style*="display: none"])');
+      if (!ul) return false;
+      const lis = Array.from(ul.querySelectorAll('li.ui-menu-item'))
+        .filter(el => el.offsetParent !== null && (el.textContent || '').trim().length > 0);
+      if (lis[idx]) {
+        lis[idx].click();
+        return true;
+      }
+      return false;
+    }, mejorIdx);
+
+    if (!clicked) {
+      // Fallback: navegar con teclado dentro del dropdown
+      await pg.focus(inputSel);
+      await sleep(200);
+      for (let i = 0; i <= mejorIdx; i++) {
+        await pg.keyboard.press('ArrowDown');
+        await sleep(150);
+      }
+      await pg.keyboard.press('Enter');
     }
-    await pg.keyboard.press('Enter');
     await sleep(500);
 
   } catch (err) {
     console.log(`  ⚠ seleccionarSugerencia error en "${inputSel}": ${err.message}`);
-    // Fallback: ArrowDown + Enter
     try {
       await pg.focus(inputSel);
       await pg.keyboard.press('ArrowDown');
