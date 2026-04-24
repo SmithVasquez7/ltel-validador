@@ -354,6 +354,16 @@ async function ejecutarValidacion(datos) {
   cancelarFlag = false; // resetear al inicio de cada validación
   const pg = await getPage();
 
+  // ── Capturar alerts nativos de WIN (ej: "Debe completar todos los datos") ──
+  let lastAlertMsg = '';
+  const dialogHandler = async dialog => {
+    lastAlertMsg = dialog.message();
+    console.log(`  ⚠ Alert nativo WIN: "${lastAlertMsg}"`);
+    await dialog.accept();
+  };
+  pg.removeAllListeners('dialog');
+  pg.on('dialog', dialogHandler);
+
   // Helper para verificar cancelación en cualquier punto del flujo
   function checkCancelar() {
     if (cancelarFlag) {
@@ -436,6 +446,18 @@ async function ejecutarValidacion(datos) {
     await sleep(600);
     await shot(pg, '06_coords_filled');
 
+    // Verificar que lat/lon se llenaron
+    const coordsReales = await pg.evaluate((sel) => ({
+      lat: (document.querySelector(sel.input_lat) || {}).value || '',
+      lon: (document.querySelector(sel.input_lon) || {}).value || '',
+    }), WIN.sel);
+    if (!coordsReales.lat || !coordsReales.lon) {
+      const falta = [];
+      if (!coordsReales.lat) falta.push('Latitud');
+      if (!coordsReales.lon) falta.push('Longitud');
+      throw new Error(`Coordenadas incompletas: falta ${falta.join(' y ')}. Verifica el formato (ej: -8.1116, -79.0287).`);
+    }
+
   } else {
     setProgreso(5, 'Ingresando dirección por calle...', '🏠');
     console.log('📌 Paso 4: Ingresando dirección por calle...');
@@ -473,10 +495,32 @@ async function ejecutarValidacion(datos) {
     if (datos.km)      { await limpiarYEscribir(pg, WIN.sel.input_km,      datos.km);      await sleep(800); }
 
     await shot(pg, '06_calle_filled');
+
+    // Verificar que los campos realmente se llenaron (autocomplete puede fallar silenciosamente)
+    const camposReales = await pg.evaluate((sel) => ({
+      distrito: (document.querySelector(sel.input_distrito) || {}).value || '',
+      via:      (document.querySelector(sel.input_via)      || {}).value || '',
+      numero:   (document.querySelector(sel.input_numero)   || {}).value || '',
+    }), WIN.sel);
+
+    const camposFaltantes = [];
+    if (!camposReales.distrito) camposFaltantes.push('Distrito');
+    if (!camposReales.via)      camposFaltantes.push('Calle / Av.');
+    if (!camposReales.numero)   camposFaltantes.push('Número');
+
+    if (camposFaltantes.length > 0) {
+      console.log(`  ⚠ Campos vacíos detectados: ${camposFaltantes.join(', ')}`);
+      console.log(`  📋 Valores reales: distrito="${camposReales.distrito}", via="${camposReales.via}", numero="${camposReales.numero}"`);
+      throw new Error(`Campos incompletos en WIN: ${camposFaltantes.join(', ')}. ` +
+        `Verifica que los datos ingresados sean correctos. ` +
+        (camposFaltantes.includes('Distrito') ? 'El distrito no fue reconocido por WIN. ' : '') +
+        (camposFaltantes.includes('Calle / Av.') ? 'La calle/avenida no fue encontrada en el autocompletado de WIN. ' : ''));
+    }
   }
 
   // ── PASO 5: Clic en Buscar ─────────────────────────────────────
   checkCancelar();
+  lastAlertMsg = '';
   setProgreso(6, 'Buscando ubicación en mapa...', '🗺️');
   console.log('📌 Paso 5: Buscando en mapa...');
   const selBuscar = datos.tipo === 'coords' ? WIN.sel.btn_buscar_coord : WIN.sel.btn_buscar;
@@ -484,6 +528,14 @@ async function ejecutarValidacion(datos) {
   await sleep(500);
   await pg.click(selBuscar);
   await sleep(2500); // esperar que el mapa procese y genere el popup
+
+  // Verificar si WIN mostró un alert nativo (ej: "Debe completar todos los datos")
+  if (lastAlertMsg) {
+    console.log(`  ✗ WIN mostró alert al buscar: "${lastAlertMsg}"`);
+    await shot(pg, '07_alert_buscar');
+    throw new Error(`WIN no pudo buscar la dirección: "${lastAlertMsg}". ` +
+      'Verifica que el distrito, la calle y el número estén escritos correctamente.');
+  }
   await shot(pg, '07_after_buscar');
 
   // ── PASO 6: Clic en Confirmar del popup ───────────────────────
@@ -517,6 +569,7 @@ async function ejecutarValidacion(datos) {
 
   // ── PASO 7: Clic en Continuar ─────────────────────────────────
   checkCancelar();
+  lastAlertMsg = '';
   setProgreso(8, 'Avanzando a información del cliente...', '➡️');
   console.log('📌 Paso 7: Esperando y clicando Continuar...');
   await pg.waitForSelector(WIN.sel.btn_continuar, { timeout: 25000 });
@@ -524,6 +577,13 @@ async function ejecutarValidacion(datos) {
   await shot(pg, '10_continuar_visible');
   await pg.click(WIN.sel.btn_continuar);
   await sleep(2500);
+
+  if (lastAlertMsg) {
+    console.log(`  ✗ WIN mostró alert al continuar: "${lastAlertMsg}"`);
+    await shot(pg, '11_alert_continuar');
+    throw new Error(`WIN no permitió continuar: "${lastAlertMsg}". ` +
+      'Es posible que la ubicación no se haya confirmado correctamente en el mapa.');
+  }
   await shot(pg, '11_info_cliente_tab');
 
   // ── PASO 8: Leer resultado de cobertura ───────────────────────
@@ -612,12 +672,20 @@ async function ejecutarValidacion(datos) {
 
   // ── PASO 11: Clic en buscar score ─────────────────────────────
   checkCancelar();
+  lastAlertMsg = '';
   setProgreso(11, 'Consultando score crediticio...', '📊');
   console.log('📌 Paso 11: Buscando score del cliente...');
   await pg.waitForSelector(WIN.sel.btn_buscar_score, { timeout: 5000 });
   await sleep(300);
   await pg.click(WIN.sel.btn_buscar_score);
   await sleep(1500);
+
+  if (lastAlertMsg) {
+    console.log(`  ✗ WIN mostró alert al buscar score: "${lastAlertMsg}"`);
+    await shot(pg, '15_alert_score');
+    throw new Error(`WIN no pudo consultar el score: "${lastAlertMsg}". ` +
+      `Verifica que el ${(datos.tipoDoc || 'DNI').toUpperCase()} "${datos.dni}" sea correcto.`);
+  }
   await shot(pg, '15_score_buscando');
 
   // ── PASO 12: Leer SweetAlert (puede ser éxito, rechazo, advertencia, etc.) ────────
@@ -767,7 +835,8 @@ async function ejecutarValidacion(datos) {
     console.error(`  ❌ Firestore NO guardó: ${fsErr.message}`);
   }
 
-  // ── Volver atrás para dejar la plataforma lista para la siguiente consulta ──
+  // ── Limpiar dialog handler y volver atrás ──
+  pg.removeListener('dialog', dialogHandler);
   console.log('  ← Volviendo atrás para nueva consulta...');
   await pg.goBack({ waitUntil: 'domcontentloaded', timeout: 15000 }).catch(() => {});
   await sleep(1500);

@@ -846,10 +846,44 @@ document.getElementById('validForm').addEventListener('submit',async(e)=>{
       showResult(uiType, uiTitle, uiSub, detalles);
     } else {
       esExito = false;
-      showResult('error','Error en validación',data.error||'Error desconocido',[
+      const errMsg = data.error || 'Error desconocido';
+      let errTitle = 'Error en validación';
+      let errSub = errMsg;
+      const detallesErr = [
         {label:'DNI',val:dni},{label:'Dirección',val:direccionResumen},
-        {label:'Error',val:data.error||'Ver consola del servidor'},
-      ]);
+      ];
+
+      if (/campos incompletos/i.test(errMsg)) {
+        errTitle = '⚠ Campos incompletos';
+        errSub = 'WIN detectó que faltan datos en el formulario. Revisa los campos marcados.';
+        const match = errMsg.match(/Campos incompletos en WIN:\s*(.+?)\./);
+        if (match) detallesErr.push({label:'Campos faltantes', val: match[1]});
+        const consejo = errMsg.includes('distrito') ? 'El distrito ingresado no fue reconocido.'
+          : errMsg.includes('calle') || errMsg.includes('Calle') ? 'La calle/avenida no fue encontrada en WIN.'
+          : 'Verifica que los datos sean correctos e intenta de nuevo.';
+        detallesErr.push({label:'Sugerencia', val: consejo});
+      } else if (/no pudo buscar|no permitió continuar|Debe completar/i.test(errMsg)) {
+        errTitle = '⚠ WIN rechazó la operación';
+        const alertaMatch = errMsg.match(/"(.+?)"/);
+        errSub = alertaMatch ? `WIN dijo: "${alertaMatch[1]}"` : errMsg;
+        detallesErr.push({label:'Causa', val:'Uno o más campos no fueron aceptados por WIN'});
+        detallesErr.push({label:'Solución', val:'Verifica distrito, calle/av. y número. Intenta con datos más específicos.'});
+      } else if (/coordenadas incompletas/i.test(errMsg)) {
+        errTitle = '⚠ Coordenadas inválidas';
+        errSub = errMsg;
+        detallesErr.push({label:'Formato correcto', val:'Latitud: -8.1116 | Longitud: -79.0287'});
+      } else if (/no pudo consultar el score/i.test(errMsg)) {
+        errTitle = '⚠ Error al consultar score';
+        errSub = errMsg;
+        detallesErr.push({label:'Solución', val:`Verifica que el ${tipoDocActual} sea correcto`});
+      } else if (/cancelad/i.test(errMsg)) {
+        errTitle = '⚠ Validación cancelada';
+        errSub = 'La validación fue cancelada manualmente.';
+      } else {
+        detallesErr.push({label:'Detalle', val: errMsg});
+      }
+
+      showResult('error', errTitle, errSub, detallesErr);
     }
   }catch(err){
     esExito = false;
@@ -877,12 +911,12 @@ document.getElementById('validForm').addEventListener('submit',async(e)=>{
     document.getElementById('btn-ok-wrap').style.display = 'block';
     setTimeout(()=>{ loadHistorial(); loadStats(); }, 3000);
   } else {
-    // Error: ocultar OK, limpiar el error automáticamente en 5s y dejar el form listo
+    // Error: ocultar OK, limpiar el error automáticamente en 12s para que el trabajador lea
     document.getElementById('btn-ok-wrap').style.display = 'none';
     setTimeout(()=>{
       cerrarResultado();
       loadHistorial(); loadStats();
-    }, 5000);
+    }, 12000);
   }
 });
 
